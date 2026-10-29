@@ -8,7 +8,7 @@ immutable deployments, so promote and rollback are a single routing update (visi
 
 ## Status
 Phases 1 and 2 are done (local and remote builds, rollback, GitHub push deploys) along with build-time
-environment variables. No dashboard, custom domains or preview URLs yet.
+environment variables and custom domains (HTTPS, Route 53 automation). No dashboard or preview URLs yet.
 
 ## Setup
 ```sh
@@ -33,6 +33,9 @@ deployer env ls -p demo                                    # names only; values 
 deployer github connect -p demo --repo owner/name   # deploy on every push (asks for a GitHub token)
 deployer github deploy -p demo                  # build the connected branch's current head now
 deployer github disconnect -p demo
+deployer domain add app.example.com -p demo     # your own hostname with HTTPS (certificate, distribution, DNS)
+deployer domain ls                              # domains and their state
+deployer domain rm app.example.com              # remove it completely
 deployer status                                 # account, stack, URL, totals
 deployer list                                   # all projects: live host, version, size
 deployer list --project demo                    # one project's deployments
@@ -107,7 +110,9 @@ otherwise derive from the construct path (the routing table, router function and
 stack-specific, except for a stack called `Deployer`, which keeps its original names so existing installs are not
 replaced when they update.
 
-Until custom domains land, a project is served at the CloudFront domain, so the last project deployed
-to the default host wins; use `--host` to serve several projects.
+Without a custom domain a project is served at the CloudFront domain, so the last project deployed there
+wins. With `domain add`, each project gets its own hostname; a deploy updates all of a project's hosts (or the
+host you pass with `--host`), and rollback moves them together. See section 5.5 of the guide, including how to use a
+GoDaddy or other registrar domain by delegating a subdomain to Route 53.
 
 License: Apache-2.0

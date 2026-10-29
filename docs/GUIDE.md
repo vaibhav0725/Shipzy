@@ -33,8 +33,8 @@ the CLI on your machine.
 - A deploy produces an immutable copy of your site. Going live, and going back, is a single small update.
 - You can build on your own machine (fast) or inside your AWS account (reproducible, and needed for GitHub).
 
-**It is not (yet)**: a hosted service, a dashboard, or a Next.js host. Custom domains and pull-request preview URLs
-are not built. See [section 13](#13-status-and-roadmap).
+**It is not (yet)**: a hosted service, a dashboard, or a Next.js host. Pull-request preview URLs are not built yet. See
+[section 13](#13-status-and-roadmap).
 
 ---
 
@@ -144,6 +144,11 @@ of truth for what can be rolled back to.
 - Override the install or build step (for example `--install-command "npm ci --legacy-peer-deps"`).
 - Build-time environment variables for remote and GitHub builds, stored encrypted in your account, with separate
   production and preview values.
+
+**Domains**
+- Your own hostnames with HTTPS (`domain add`): certificate, CloudFront distribution and, if the domain is in Route 53,
+  the DNS records, all created for you. Any other DNS provider works too (you add the printed records).
+- Several projects side by side, each on its own hostname; one project on several hostnames.
 
 **Operating**
 - Instant rollback to the previous deployment, or to any recorded one.
@@ -289,7 +294,52 @@ deployer env rm -p my-app VITE_API_URL
   the build process only. CodeBuild masks injected values in logs, and the build's metadata lists only the parameter
   paths.
 
-### 5.5 Roll back
+### 5.5 Custom domains
+
+By default every project is served at the stack's CloudFront URL, so the **last project deployed there wins**. Give each
+project its own hostname instead:
+
+```sh
+deployer domain add app.example.com -p my-app     # certificate + distribution + DNS (about 5 to 15 minutes)
+deployer domain ls                                # hosts, project, stack, certificate and DNS state
+deployer domain verify app.example.com            # re-check everything; safe to run any time
+deployer domain rm app.example.com                # remove it completely (asks to confirm)
+```
+
+`domain add` does this, and can be rerun at any point to continue where it stopped:
+
+1. Looks for a **Route 53 hosted zone** in your account that covers the hostname (the longest matching suffix).
+   - **Zone found:** every DNS record is created for you, and `domain rm` removes the ones it created.
+   - **No zone, or `--manual`:** the exact records are printed and the command waits. Add them wherever your DNS is
+     hosted. There are two: a validation CNAME for the certificate (keep it, since the certificate renews through
+     it) and a CNAME from your hostname to the CloudFront domain it prints.
+2. Requests a free **ACM certificate** in `us-east-1` (CloudFront requires that region whatever your stack's region is).
+3. Creates a small CloudFormation stack, `<stack>-domain-<hostname>`, holding one CloudFront distribution that reuses
+   the main stack's router, routing table and bucket access. Your main distribution is never touched.
+4. Records the hostname on the project and routes it to the project's live deployment.
+
+**Which hosts does a deploy update?** `--host` if you pass it; otherwise all of the project's domains; otherwise the
+CloudFront URL. A project with domains keeps updating the CloudFront URL only while it already owns that route, so a
+project never takes over another project's default URL by accident. Rollback moves the same set together.
+
+**Using a domain you own elsewhere (GoDaddy, Namecheap and so on).** Pick a subdomain and **delegate** it to Route 53
+so the whole thing is automatic:
+
+1. In Route 53 create a hosted zone for the subdomain, for example `apps.example.com`. It shows four name servers.
+2. At your registrar add four `NS` records named `apps` (the subdomain part only) with those four values.
+3. Check with `dig NS apps.example.com @8.8.8.8`. Then `domain add blog.apps.example.com -p blog` just works.
+
+Your main site on `example.com` is unaffected. If you would rather not delegate, use `--manual`. **A bare domain
+(`example.com`) cannot be a CNAME**, which is what most registrars offer, so use a subdomain (`www.example.com`) or move
+the domain's DNS to Route 53.
+
+**Good to know**
+- A hostname can belong to only one CloudFront distribution in the world. If it already does (for example on an old
+  site), `domain add` stops with a message saying so; remove it from that distribution first.
+- Each domain is one distribution (default quota 500 per account) and one certificate. Certificates are free.
+- Route 53 charges about $0.50 a month per hosted zone; the CloudFront distribution itself costs nothing when idle.
+
+### 5.6 Roll back
 
 ```sh
 deployer list -p my-app               # shows deployment ids and which is live
@@ -300,7 +350,7 @@ deployer rollback -p my-app --to d-20261029T104026-4dc09a   # or to a specific o
 It takes effect in about 30 seconds. Only recorded deployments can be rolled back to, and only the newest 10 are kept
 by default.
 
-### 5.6 See what you have
+### 5.7 See what you have
 
 ```sh
 deployer status        # account, stack, URL, build setup, last build, totals
@@ -308,7 +358,7 @@ deployer list          # every project: where it is live, how old, auto-deploy s
 deployer list -p my-app
 ```
 
-### 5.7 Clean up
+### 5.8 Clean up
 
 ```sh
 deployer prune -p my-app --dry-run    # see what would be deleted
@@ -320,7 +370,7 @@ deployer destroy                      # remove the entire stack (asks you to typ
 `delete` removes the project's routes, every deployment folder, its uploaded sources, its environment variables and its GitHub webhook. If the
 project is live, that site starts returning 404 until something else is deployed.
 
-### 5.8 More than one stack
+### 5.9 More than one stack
 
 `--stack-name` makes an independent copy in the same account, for example a staging environment:
 
@@ -349,7 +399,7 @@ If a first attempt failed and rolled back, `init` removes the failed stack and r
 | Option | Meaning |
 |---|---|
 | `-p, --project <name>` | Project name (default: from `package.json`) |
-| `--host <hostname>` | Host to serve on (default: the CloudFront domain) |
+| `--host <hostname>` | Host to serve on (default: the project's domains, else the CloudFront domain) |
 | `--skip-build` | Upload the existing `dist/` or `build/` as it is (local only) |
 | `--remote` | Build in CodeBuild in your account instead of on this machine |
 | `--detach` | With `--remote`: start the build and return without waiting |
@@ -380,7 +430,7 @@ streaming until the build finishes. The exit code is 1 if the build did not succ
 |---|---|
 | `-p, --project <name>` | Project (required) |
 | `--to <deploymentId>` | Deployment to serve (default: the one before the live one) |
-| `--host <hostname>` | Host to roll back (default: the CloudFront domain) |
+| `--host <hostname>` | Host to roll back (default: all of the project's hosts, together) |
 
 ### `prune`
 | Option | Meaning |
@@ -395,6 +445,14 @@ streaming until the build finishes. The exit code is 1 if the build did not succ
 
 ### `destroy`
 Removes GitHub webhooks, empties both buckets and deletes the stack. `-y, --yes` skips the confirmation.
+
+### `domain add`, `ls`, `verify`, `rm`
+| Command | Options | What it does |
+|---|---|---|
+| `domain add <host>` | `-p, --project`, `--manual`, `--no-wait` | Creates the certificate and distribution, and the DNS records when a Route 53 zone exists. Rerun to continue. `--no-wait` returns instead of waiting for the certificate and DNS |
+| `domain ls` | | Hosts with project, stack status, certificate status and whether DNS reaches the distribution |
+| `domain verify <host>` | | Checks the stack, certificate, project claim and DNS |
+| `domain rm <host>` | `-y, --yes` | Removes the route, distribution stack and certificate, and only the DNS records this tool created |
 
 ### `env set`, `import`, `ls`, `rm`
 | Command | Options | What it does |
@@ -461,6 +519,7 @@ or, outside a git repository, a directory walk using the root `.gitignore`. Thes
 | Lambda "webhook" + Function URL | Receives GitHub push events |
 | Secrets Manager: webhook secret, GitHub token | Signing secret and the token used to clone |
 | Parameter Store (SecureString), created on demand | Your projects' build-time environment variables, under `/deployer/<stack>/…` |
+| Per custom domain, created by `domain add`: a CloudFormation stack `<stack>-domain-<host>` with one CloudFront distribution, an ACM certificate (`us-east-1`), and Route 53 records if you have a zone | One hostname with HTTPS |
 | 3 CloudWatch log groups | Kept for 14 days |
 | 3 IAM roles (+ policies) | See below |
 
@@ -492,7 +551,9 @@ settings keep S3 storage bounded.
   appear in error output). Build logs were scanned for the token (the stack's placeholder value, in tests) and it
   never appeared, but treat logs as sensitive anyway. Use a fine-grained token limited to
   one repository, with a short expiry for testing, and revoke it when you no longer need it.
-- **Buckets are private.** Visitors only reach site files through CloudFront.
+- **Buckets are private.** Visitors only reach site files through CloudFront. To serve custom domains, the sites
+  bucket policy allows any CloudFront distribution **in the same AWS account** to read it through the Origin Access
+  Control. Nothing outside the account can.
 - **Build code is arbitrary code.** CodeBuild runs a project's own install and build scripts in your account, with the
   build role's permissions. Only build code you trust.
 - **Dev credentials.** During development an admin IAM user was used. Before any wider release, replace that with a
@@ -503,9 +564,11 @@ settings keep S3 storage bounded.
 
 ## 10. Limits and known issues
 
-- **One site per URL for now.** All projects share the CloudFront URL, so the last project deployed there wins.
-  `--host` only helps once custom domains exist (a host must actually reach the distribution).
-- **No custom domains or preview URLs yet.**
+- **The CloudFront URL is one shared address**: the last project deployed to it wins. Give each project a custom
+  domain (section 5.5) to avoid that.
+- **No preview URLs yet.**
+- **Custom domains are one distribution each**, so they count against your account's CloudFront quota, and wildcard
+  domains are not supported yet.
 - **Static React only.** No Next.js or server rendering.
 - **Remote builds are slow to start** (about 1.5 minutes before your build begins).
 - **Missing files return a 403** XML page from S3 instead of a 404.
@@ -515,7 +578,8 @@ settings keep S3 storage bounded.
 - **Routing changes take about 30 seconds** to reach every edge location, not zero.
 - **No automated test suite.** The system was verified by running every feature against a real AWS account, including
   failure cases and a full create and destroy of a throwaway stack. Adding automated tests is future work.
-- Not yet exercised: serving several projects on separate hosts, and registering the webhook on a repository owned by
+- Not yet exercised: replacing a hostname that another distribution already holds (the error message is written but
+  was never triggered for real), updating an existing domain stack (there is no change-set preview for domain stacks, unlike `init`), and registering the webhook on a repository owned by
   a GitHub organization (which may need an owner to approve the token).
 
 ---
@@ -534,6 +598,9 @@ settings keep S3 storage bounded.
 | `Next.js is not supported yet` | Only static React projects work for now. |
 | `deployer: command not found` | The link is gone or your PATH does not include npm's global bin folder (`npm prefix -g`). Run `npm link` again in `apps/cli`. |
 | `Stack "Deployer" not found. Run deployer init first.` | The stack does not exist in this account and region, or you are using a different `--profile`, `--region` or `--stack-name`. |
+| `domain add` says the hostname is already used by another CloudFront distribution | A hostname can be attached to one distribution only. Remove it from the other distribution (or its stack) first, then rerun. |
+| `domain add` waits for the certificate for a long time | Its validation CNAME is not visible. With Route 53 check the zone is delegated (`dig NS <zone> @8.8.8.8`); with manual DNS check you added the record exactly as printed. |
+| `domain verify` says DNS does not reach the distribution | The hostname's CNAME or alias is missing or still propagating. Compare with the record `domain add` printed. |
 | Visitors get a plain-text "No deployment is live for …" | The hostname has no route. Deploy to it, or roll back to a recorded deployment. |
 | A site still shows the old version | Routing changes take about 30 seconds to reach every location. |
 | `init` fails, or the stack shows `ROLLBACK_COMPLETE` | Rerun `init`: it removes the failed stack and tries again, and prints the resource that actually failed. |
@@ -588,14 +655,14 @@ table uses a pure-JavaScript implementation, so nothing native is installed or s
 | GitHub push deploys, secret rotation | done, including a real push from a real repository |
 | Concurrency safety (history file and routing table) | done |
 | Build-time environment variables (production and preview scopes) | done |
+| Custom domains: Route 53 automatic and manual DNS, side-by-side projects, removal | done, on a real delegated subdomain |
 
 **Next (planned):**
 
-1. **Custom domains**, which also lets several projects share one account side by side.
-2. **Pull-request preview URLs.**
-3. **A least-privilege policy** for the person running the CLI, before any public release.
-4. **A web dashboard** that connects to your AWS account (a cross-account role, with no raw keys), and can also be
+1. **Pull-request preview URLs.**
+2. **A least-privilege policy** for the person running the CLI, before any public release.
+3. **A web dashboard** that connects to your AWS account (a cross-account role, with no raw keys), and can also be
    self-hosted.
-5. **Other static frameworks** (Vue, Svelte, Astro static), then **server-rendered frameworks** such as Next.js.
+4. **Other static frameworks** (Vue, Svelte, Astro static), then **server-rendered frameworks** such as Next.js.
 
 License: Apache-2.0.
