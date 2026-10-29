@@ -33,7 +33,7 @@ the CLI on your machine.
 - A deploy produces an immutable copy of your site. Going live, and going back, is a single small update.
 - You can build on your own machine (fast) or inside your AWS account (reproducible, and needed for GitHub).
 
-**It is not (yet)**: a hosted service, a dashboard, or a Next.js host. Pull-request preview URLs are not built yet. See
+**It is not (yet)**: a hosted service, a dashboard you can open from anywhere (there is a local one, section 5.10), or a Next.js host. Pull-request preview URLs are not built yet. See
 [section 13](#13-status-and-roadmap).
 
 ---
@@ -149,6 +149,10 @@ of truth for what can be rolled back to.
 - Your own hostnames with HTTPS (`domain add`): certificate, CloudFront distribution and, if the domain is in Route 53,
   the DNS records, all created for you. Any other DNS provider works too (you add the printed records).
 - Several projects side by side, each on its own hostname; one project on several hostnames.
+
+**Dashboard**
+- `deployer dashboard` opens a web UI on your own computer: deploy from a folder or a GitHub repository, then roll
+  back, manage domains and variables, and follow build logs live. It runs the same CLI underneath.
 
 **Operating**
 - Instant rollback to the previous deployment, or to any recorded one.
@@ -379,6 +383,52 @@ deployer --stack-name Staging init
 deployer --stack-name Staging deploy ./my-react-app
 ```
 
+### 5.10 The local dashboard
+
+```sh
+deployer dashboard                # starts it and opens your browser
+deployer dashboard --port 4300 --no-open
+```
+
+A web UI for everything above, started from a terminal and reachable **only from your own computer**
+(`127.0.0.1`). It uses the same AWS profile, region and stack as the CLI (`--profile`, `--region`, `--stack-name` work
+before `dashboard`). Press Ctrl-C in the terminal to stop it.
+
+| Screen | What you do there |
+|---|---|
+| Overview | Account, stack, shared URL, totals, last build. If the stack does not exist it tells you to run `deployer init` |
+| Projects | Every project: where it is live, age, auto-deploy source, versions, size |
+| New deployment | Deploy from **a folder on this computer** (type or browse to it; build here or in AWS) or from **a GitHub repository** (repository, branch, token or the stored token) |
+| Project: Deployments | History with live badges, "Serve this one" (rollback), preview and run cleanup, delete the project |
+| Project: Domains | Add (progress shown live), check and remove custom domains |
+| Project: Environment | Add or remove variables, import a pasted `.env`; values are never shown |
+| Project: GitHub | The connection, "build the current head now", disconnect |
+| Project: Builds | Recent builds in AWS and their logs |
+| Activity | Everything started from the dashboard, with its full output |
+
+**How it works.** The dashboard is a Next.js app shipped inside the CLI package. Reading data and every action run the
+`deployer` command itself (with `--json` for reads), so behaviour is identical to the terminal and nothing is
+re-implemented. Actions run as background jobs; their output streams to the browser live and is kept in memory while
+the dashboard runs. Closing the browser tab does not stop a job; stopping the dashboard does (a build already started
+in AWS keeps running there).
+
+**Safety.**
+- It listens on `127.0.0.1` only. Each run has a random token in the address it prints; opening that address signs the
+  browser in with a cookie that lasts until you stop the dashboard. Requests need that cookie, a `Host` header that
+  names the local server, and (for changes) a matching `Origin`, so another website you visit cannot drive it.
+- Every value from the browser is validated before it becomes a command-line argument, and arguments are passed as a
+  list, never through a shell.
+- Secrets (a GitHub token, a variable's value) travel through the environment or standard input, never on a command
+  line, and are blanked out of job logs. No page or API ever returns them. Child processes do not receive the
+  dashboard's own token.
+- Deploying without a hostname to a project that has no domains asks you to agree that it **replaces whatever is
+  live at the shared CloudFront address**.
+- Cancelling a job stops the local process. If the build had already started in AWS, it finishes anyway.
+
+**Limits.** `init` and `destroy` stay terminal-only on purpose. The dashboard is a local tool: anyone who can use your
+computer's browser session and reach `127.0.0.1` while it runs has your AWS access through it, so stop it when you are
+done. A hosted or self-hosted dashboard for teams is a later step.
+
 ---
 
 ## 6. Command reference
@@ -430,7 +480,7 @@ streaming until the build finishes. The exit code is 1 if the build did not succ
 |---|---|
 | `-p, --project <name>` | Project (required) |
 | `--to <deploymentId>` | Deployment to serve (default: the one before the live one) |
-| `--host <hostname>` | Host to roll back (default: all of the project's hosts, together) |
+| `--host <hostname>` | Host to roll back (default: all of the hosts the project is live on, together) |
 
 ### `prune`
 | Option | Meaning |
@@ -445,6 +495,12 @@ streaming until the build finishes. The exit code is 1 if the build did not succ
 
 ### `destroy`
 Removes GitHub webhooks, empties both buckets and deletes the stack. `-y, --yes` skips the confirmation.
+
+### `dashboard`
+| Option | Meaning |
+|---|---|
+| `--port <number>` | Port to listen on (default 4173; `127.0.0.1` only) |
+| `--no-open` | Print the address without opening the browser |
 
 ### `domain add`, `ls`, `verify`, `rm`
 | Command | Options | What it does |
@@ -655,14 +711,15 @@ table uses a pure-JavaScript implementation, so nothing native is installed or s
 | GitHub push deploys, secret rotation | done, including a real push from a real repository |
 | Concurrency safety (history file and routing table) | done |
 | Build-time environment variables (production and preview scopes) | done |
+| Local dashboard (`deployer dashboard`): deploy from a folder or GitHub, rollback, domains, variables, live logs | done, driven through its API against a real account |
 | Custom domains: Route 53 automatic and manual DNS, side-by-side projects, removal | done, on a real delegated subdomain |
 
 **Next (planned):**
 
 1. **Pull-request preview URLs.**
 2. **A least-privilege policy** for the person running the CLI, before any public release.
-3. **A web dashboard** that connects to your AWS account (a cross-account role, with no raw keys), and can also be
-   self-hosted.
+3. **A hosted or self-hosted dashboard** that connects to your AWS account (a cross-account role, with no raw keys).
+   The local dashboard (section 5.10) already exists and would be the base for it.
 4. **Other static frameworks** (Vue, Svelte, Astro static), then **server-rendered frameworks** such as Next.js.
 
 License: Apache-2.0.

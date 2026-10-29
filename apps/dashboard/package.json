@@ -1,0 +1,23 @@
+{
+  "name": "@deployer/dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "Local web dashboard for deployer (started by `deployer dashboard`)",
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1 --port ${PORT:-4173}",
+    "build": "next build && node scripts/stage.mjs",
+    "typecheck": "tsc -p . --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "next": "16.4.1",
+    "react": "19.2.9",
+    "react-dom": "19.2.9"
+  }
+}

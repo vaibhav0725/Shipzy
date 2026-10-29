@@ -1,4 +1,4 @@
-import { readManifest } from '@deployer/core';
+import { listRoutes, readManifest } from '@deployer/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { formatBytes, table, timeAgo } from '../lib/format.js';
 import { listProjects } from '../lib/projects.js';
@@ -31,6 +31,10 @@ export async function list(opts: ListOptions, global: GlobalOptions): Promise<vo
   }
 
   const manifest = await readManifest(out.bucket, opts.project);
+  // What is live is whatever the routing table points at this project, not what the history file last recorded
+  // (a host can be taken over by another project, or changed by hand).
+  const routes = (await listRoutes(out.kvsArn)).filter((r) => r.target.startsWith(`${opts.project}/`));
+  manifest.live = Object.fromEntries(routes.map((r) => [r.host, r.target.slice(opts.project!.length + 1)]));
   if (opts.json) return console.log(JSON.stringify(manifest, null, 2));
   if (manifest.deployments.length === 0) {
     console.log(`No deployments for "${opts.project}".`);

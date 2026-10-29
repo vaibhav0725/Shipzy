@@ -4,6 +4,7 @@ import * as net from 'node:net';
 import { Command } from 'commander';
 import { configureEnv, errorMessage, GlobalOptions } from './lib/aws.js';
 import { builds } from './commands/builds.js';
+import { dashboard } from './commands/dashboard.js';
 import { deploy } from './commands/deploy.js';
 import { deleteProject } from './commands/delete.js';
 import { domainAdd, domainList, domainRemove, domainVerify } from './commands/domain.js';
@@ -41,6 +42,13 @@ function globals(): GlobalOptions {
   configureEnv(opts);
   return opts;
 }
+
+program
+  .command('dashboard')
+  .description('Open a local web dashboard (runs on this computer only)')
+  .option('--port <number>', 'port to listen on (127.0.0.1 only)', '4173')
+  .option('--no-open', 'do not open the browser')
+  .action((opts) => dashboard(opts, globals()));
 
 program.command('init').description('Create or update the AWS stack').action(() => init(globals()));
 
@@ -182,7 +190,7 @@ program
   .description('Point a host back at a previous deployment (instant)')
   .requiredOption('-p, --project <name>')
   .option('--to <deploymentId>', 'deployment to serve (default: the one before the live one)')
-  .option('--host <hostname>', 'host to roll back (default: the CloudFront domain)')
+  .option('--host <hostname>', 'host to roll back (default: every host the project is live on)')
   .action((opts) => rollback(opts, globals()));
 
 program

@@ -1,4 +1,4 @@
-import { readManifest, resolveTargetHosts, routeTarget, setRoute, updateManifest } from '@deployer/core';
+import { listRoutes, readManifest, routeTarget, setRoute, updateManifest } from '@deployer/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 
 export interface RollbackOptions {
@@ -10,12 +10,20 @@ export interface RollbackOptions {
 export async function rollback(opts: RollbackOptions, global: GlobalOptions): Promise<void> {
   const out = await getOutputs(global.stackName);
   const manifest = await readManifest(out.bucket, opts.project);
-  const hosts = await resolveTargetHosts(out, opts.project, manifest.domains, out.domain, opts.host ? [opts.host] : undefined);
+
+  // A rollback moves what the project is serving right now. That is read from the routing table (the source of
+  // truth), never guessed: a project deployed with --host is not on the shared CloudFront address, and rolling
+  // back must not put its old version there.
+  const owned = (await listRoutes(out.kvsArn)).filter((r) => r.target.startsWith(`${opts.project}/`));
+  const hosts = opts.host ? [opts.host.toLowerCase()] : owned.map((r) => r.host.toLowerCase());
+  if (hosts.length === 0) {
+    throw new Error(`"${opts.project}" is not live anywhere, so there is nothing to roll back. Pass --host <hostname> --to <id> to serve a deployment.`);
+  }
 
   let target = opts.to;
   if (!target) {
     // The hosts are normally in step; go by the first one that has something live.
-    const liveId = hosts.map((h) => manifest.live[h]).find(Boolean);
+    const liveId = owned.find((r) => hosts.includes(r.host.toLowerCase()))?.target.slice(opts.project.length + 1);
     const idx = manifest.deployments.findIndex((d) => d.id === liveId);
     if (!liveId || idx < 0) throw new Error(`No live deployment for ${hosts.join(', ')}; pass --to <id>.`);
     if (idx === 0) throw new Error('This is the oldest deployment; nothing to roll back to.');

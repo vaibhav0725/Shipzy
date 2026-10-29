@@ -8,7 +8,7 @@ immutable deployments, so promote and rollback are a single routing update (visi
 
 ## Status
 Phases 1 and 2 are done (local and remote builds, rollback, GitHub push deploys) along with build-time
-environment variables and custom domains (HTTPS, Route 53 automation). No dashboard or preview URLs yet.
+environment variables, custom domains (HTTPS, Route 53 automation) and a local web dashboard. No hosted dashboard or preview URLs yet.
 
 ## Setup
 ```sh
@@ -36,6 +36,7 @@ deployer github disconnect -p demo
 deployer domain add app.example.com -p demo     # your own hostname with HTTPS (certificate, distribution, DNS)
 deployer domain ls                              # domains and their state
 deployer domain rm app.example.com              # remove it completely
+deployer dashboard                              # local web UI: deploy from a folder or GitHub, manage everything
 deployer status                                 # account, stack, URL, totals
 deployer list                                   # all projects: live host, version, size
 deployer list --project demo                    # one project's deployments

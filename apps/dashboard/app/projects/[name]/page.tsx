@@ -1,0 +1,356 @@
+'use client';
+
+import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
+import { ReactNode, useState } from 'react';
+import { Badge, Confirm, ErrorNotice, StatusBadge } from '@/components/bits';
+import { BuildRow, DomainRow, EnvRow, Manifest, siteUrl, startAction, timeAgo, useApi } from '@/lib/client';
+
+type Tab = 'deployments' | 'domains' | 'environment' | 'github' | 'builds';
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'deployments', label: 'Deployments' },
+  { id: 'domains', label: 'Domains' },
+  { id: 'environment', label: 'Environment' },
+  { id: 'github', label: 'GitHub' },
+  { id: 'builds', label: 'Builds' },
+];
+
+export default function ProjectPage() {
+  const { name } = useParams<{ name: string }>();
+  const router = useRouter();
+  const [tab, setTab] = useState<Tab>('deployments');
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string>();
+  const manifest = useApi<Manifest>(`/api/projects/${name}`, { interval: 15000 });
+
+  const liveHosts = Object.keys(manifest.data?.live ?? {});
+
+  async function run(body: Record<string, unknown>) {
+    setError(undefined);
+    try {
+      const job = await startAction({ project: name, ...body });
+      router.push(`/jobs/${job.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  return (
+    <>
+      <div className="head">
+        <div>
+          <h1>{name}</h1>
+          <p className="muted">
+            {liveHosts.length === 0 ? 'Not live anywhere.' : liveHosts.map((h, i) => (
+              <span key={h}>{i > 0 && ', '}<a href={siteUrl(h)} target="_blank" rel="noreferrer">{h}</a></span>
+            ))}
+          </p>
+        </div>
+        <div className="row">
+          <Link className="btn" href={`/projects/new?project=${name}`}>Deploy a new version</Link>
+          <button className="danger" onClick={() => setDeleting(true)}>Delete project</button>
+        </div>
+      </div>
+
+      <ErrorNotice message={error ?? manifest.error} />
+
+      <div className="tabs" role="tablist">
+        {TABS.map((t) => (
+          <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'deployments' && <Deployments name={name} manifest={manifest.data} run={run} />}
+      {tab === 'domains' && <Domains name={name} run={run} />}
+      {tab === 'environment' && <Environment name={name} run={run} />}
+      {tab === 'github' && <Github name={name} manifest={manifest.data} run={run} />}
+      {tab === 'builds' && <Builds name={name} run={run} />}
+
+      {deleting && (
+        <Confirm
+          title={`Delete ${name}?`}
+          word={name}
+          action="Delete project"
+          danger
+          onCancel={() => setDeleting(false)}
+          onConfirm={() => run({ action: 'delete-project' })}
+        >
+          <p>
+            This removes every deployment, its history, uploaded sources, environment variables and custom domains, and takes
+            the GitHub webhook off the repository. If the project is live, the site stops working. It cannot be undone.
+          </p>
+        </Confirm>
+      )}
+    </>
+  );
+}
+
+type Run = (body: Record<string, unknown>) => Promise<void>;
+
+function Deployments({ name, manifest, run }: { name: string; manifest?: Manifest; run: Run }) {
+  const [rollback, setRollback] = useState<string>();
+  const [pruning, setPruning] = useState(false);
+  const liveOf = new Map<string, string[]>();
+  for (const [host, id] of Object.entries(manifest?.live ?? {})) liveOf.set(id, [...(liveOf.get(id) ?? []), host]);
+  const rows = [...(manifest?.deployments ?? [])].reverse();
+
+  return (
+    <>
+      <div className="card tablewrap">
+        <table>
+          <thead><tr><th>Deployment</th><th>Created</th><th>Files</th><th>Live on</th><th /></tr></thead>
+          <tbody>
+            {rows.map((d) => (
+              <tr key={d.id}>
+                <td className="mono">{d.id}</td>
+                <td>{timeAgo(d.createdAt)}</td>
+                <td>{d.files}</td>
+                <td>{(liveOf.get(d.id) ?? []).map((h) => <div key={h}><Badge kind="ok">live</Badge> {h}</div>)}</td>
+                <td>{!liveOf.has(d.id) && <button className="small" onClick={() => setRollback(d.id)}>Serve this one</button>}</td>
+              </tr>
+            ))}
+            {manifest && rows.length === 0 && <tr><td colSpan={5} className="muted">No deployments yet.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <div className="row">
+        <button onClick={() => void run({ action: 'prune', dryRun: true })}>Preview cleanup</button>
+        <button onClick={() => setPruning(true)}>Clean up old deployments</button>
+      </div>
+      <p className="muted small" style={{ marginTop: 8 }}>
+        Deployments are immutable. Serving an older one is instant and applies to all of the project&apos;s hosts. The newest 10
+        are kept, plus any that are live.
+      </p>
+      {rollback && (
+        <Confirm title="Serve this deployment?" action="Serve it" onCancel={() => setRollback(undefined)} onConfirm={() => run({ action: 'rollback', to: rollback })}>
+          <p>
+            <span className="mono">{rollback}</span> will go live on all of {name}&apos;s hosts within about 30 seconds.
+          </p>
+        </Confirm>
+      )}
+      {pruning && (
+        <Confirm title="Clean up old deployments?" action="Clean up" onCancel={() => setPruning(false)} onConfirm={() => run({ action: 'prune' })}>
+          <p>Deletes deployments beyond the newest 10, and uploads that were never promoted. Live deployments are never deleted.</p>
+        </Confirm>
+      )}
+    </>
+  );
+}
+
+function Domains({ name, run }: { name: string; run: Run }) {
+  const { data, error, loading } = useApi<DomainRow[]>(`/api/projects/${name}/domains`, { interval: 20000 });
+  const [host, setHost] = useState('');
+  const [manual, setManual] = useState(false);
+  const [removing, setRemoving] = useState<string>();
+
+  return (
+    <>
+      <ErrorNotice message={error} />
+      <div className="card tablewrap">
+        <table>
+          <thead><tr><th>Domain</th><th>Distribution</th><th>Certificate</th><th>DNS</th><th /></tr></thead>
+          <tbody>
+            {data?.map((d) => (
+              <tr key={d.host}>
+                <td><a href={siteUrl(d.host)} target="_blank" rel="noreferrer">{d.host}</a></td>
+                <td><StatusBadge status={d.stack} /></td>
+                <td><StatusBadge status={d.certificate} /></td>
+                <td><StatusBadge status={d.dns} /></td>
+                <td className="row">
+                  <button className="small" onClick={() => void run({ action: 'domain-verify', host: d.host })}>Check</button>
+                  <button className="small danger" onClick={() => setRemoving(d.host)}>Remove</button>
+                </td>
+              </tr>
+            ))}
+            {data?.length === 0 && <tr><td colSpan={5} className="muted">No custom domains. This project is served at the shared CloudFront address.</td></tr>}
+            {loading && !data && <tr><td colSpan={5} className="muted">Loading...</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="card">
+        <h2>Add a domain</h2>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run({ action: 'domain-add', host, manual });
+          }}
+        >
+          <label className="field">
+            <span>Hostname</span>
+            <input type="text" value={host} onChange={(e) => setHost(e.target.value)} placeholder="app.example.com" spellCheck={false} required />
+            <small>
+              If a Route 53 zone for this domain is in your account, the certificate and DNS records are created for you. Otherwise
+              the exact records are printed in the log for you to add. This takes 5 to 15 minutes.
+            </small>
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={manual} onChange={(e) => setManual(e.target.checked)} />
+            <span>I will add the DNS records myself (do not touch Route 53)</span>
+          </label>
+          <button className="primary" disabled={!host.trim()}>Add domain</button>
+        </form>
+      </div>
+
+      {removing && (
+        <Confirm title={`Remove ${removing}?`} word={removing} action="Remove domain" danger onCancel={() => setRemoving(undefined)} onConfirm={() => run({ action: 'domain-rm', host: removing })}>
+          <p>Removes its route, distribution and certificate, and the DNS records this tool created. Records you added by hand stay and are listed in the log.</p>
+        </Confirm>
+      )}
+    </>
+  );
+}
+
+function Environment({ name, run }: { name: string; run: Run }) {
+  const { data, error, loading } = useApi<EnvRow[]>(`/api/projects/${name}/env`, { interval: 20000 });
+  const [varName, setVarName] = useState('');
+  const [value, setValue] = useState('');
+  const [preview, setPreview] = useState(false);
+  const [content, setContent] = useState('');
+  const [importPreview, setImportPreview] = useState(false);
+
+  return (
+    <>
+      <div className="notice warn small">
+        These are <strong>build-time</strong> variables for builds in AWS (and GitHub pushes). They apply to the <em>next</em> build, not to
+        what is live. Anything your framework exposes to the browser (<code>VITE_*</code>, <code>REACT_APP_*</code>) ends up in public
+        JavaScript, so do not store secrets there. Values are never shown here.
+      </div>
+      <ErrorNotice message={error} />
+      <div className="card tablewrap">
+        <table>
+          <thead><tr><th>Name</th><th>Production</th><th>Preview override</th><th /></tr></thead>
+          <tbody>
+            {data?.map((r) => (
+              <tr key={r.name}>
+                <td className="mono">{r.name}</td>
+                <td>{r.production ? <Badge kind="ok">set</Badge> : '-'}</td>
+                <td>{r.preview ? <Badge kind="ok">set</Badge> : '-'}</td>
+                <td className="row">
+                  {r.production && <button className="small danger" onClick={() => void run({ action: 'env-rm', name: r.name })}>Remove</button>}
+                  {r.preview && <button className="small danger" onClick={() => void run({ action: 'env-rm', name: r.name, preview: true })}>Remove preview</button>}
+                </td>
+              </tr>
+            ))}
+            {data?.length === 0 && <tr><td colSpan={4} className="muted">No variables yet.</td></tr>}
+            {loading && !data && <tr><td colSpan={4} className="muted">Loading...</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="card">
+        <h2>Set a variable</h2>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run({ action: 'env-set', name: varName, value, preview });
+          }}
+        >
+          <div className="row" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}>
+            <label className="field" style={{ flex: 1 }}>
+              <span>Name</span>
+              <input type="text" value={varName} onChange={(e) => setVarName(e.target.value)} placeholder="VITE_API_URL" spellCheck={false} required />
+            </label>
+            <label className="field" style={{ flex: 2 }}>
+              <span>Value</span>
+              <input type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="off" required />
+            </label>
+          </div>
+          <label className="check">
+            <input type="checkbox" checked={preview} onChange={(e) => setPreview(e.target.checked)} />
+            <span>Preview builds only (overrides the production value there)</span>
+          </label>
+          <button className="primary" disabled={!varName.trim() || !value}>Save variable</button>
+        </form>
+      </div>
+
+      <div className="card">
+        <h2>Import a .env file</h2>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run({ action: 'env-import', content, preview: importPreview });
+          }}
+        >
+          <label className="field">
+            <span>Paste the file&apos;s contents</span>
+            <textarea value={content} onChange={(e) => setContent(e.target.value)} spellCheck={false} placeholder={'VITE_API_URL=https://api.example.com\nVITE_GREETING=hello'} />
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={importPreview} onChange={(e) => setImportPreview(e.target.checked)} />
+            <span>Import as preview-only overrides</span>
+          </label>
+          <button disabled={!content.trim()}>Import</button>
+        </form>
+      </div>
+    </>
+  );
+}
+
+function Github({ name, manifest, run }: { name: string; manifest?: Manifest; run: Run }) {
+  const source = manifest?.source;
+  const [disconnecting, setDisconnecting] = useState(false);
+  if (!manifest) return <p className="muted">Loading...</p>;
+  if (!source) {
+    return (
+      <div className="card">
+        <p>This project is not connected to a GitHub repository.</p>
+        <Link className="btn primary" href={`/projects/new?project=${name}&source=github`}>Connect a repository</Link>
+      </div>
+    );
+  }
+  return (
+    <>
+      <div className="card">
+        <dl className="kv">
+          <dt>Repository</dt><dd><a href={`https://github.com/${source.repo}`} target="_blank" rel="noreferrer">{source.repo}</a></dd>
+          <dt>Branch</dt><dd>{source.branch}</dd>
+          <dt>Deploys to</dt><dd>{source.host ?? ((manifest.domains ?? []).join(', ') || 'the shared CloudFront address')}</dd>
+          <dt>Install command</dt><dd>{source.installCommand ?? <span className="muted">detected</span>}</dd>
+          <dt>Build command</dt><dd>{source.buildCommand ?? <span className="muted">detected</span>}</dd>
+        </dl>
+        <p className="muted small" style={{ marginTop: 10 }}>Every push to {source.branch} builds in your AWS account and goes live.</p>
+        <div className="row">
+          <button className="primary" onClick={() => void run({ action: 'github-deploy' })}>Build the current head now</button>
+          <button className="danger" onClick={() => setDisconnecting(true)}>Disconnect</button>
+        </div>
+      </div>
+      {disconnecting && (
+        <Confirm title="Disconnect from GitHub?" action="Disconnect" danger onCancel={() => setDisconnecting(false)} onConfirm={() => run({ action: 'github-disconnect' })}>
+          <p>Pushes stop deploying this project and the webhook is removed (unless another project uses the same repository). Existing deployments stay.</p>
+        </Confirm>
+      )}
+    </>
+  );
+}
+
+function Builds({ name, run }: { name: string; run: Run }): ReactNode {
+  const { data, error, loading } = useApi<BuildRow[]>(`/api/projects/${name}/builds`, { interval: 10000 });
+  return (
+    <>
+      <ErrorNotice message={error} />
+      <div className="card tablewrap">
+        <table>
+          <thead><tr><th>Build</th><th>Status</th><th>Source</th><th>Deployment</th><th>Started</th><th>Took</th><th /></tr></thead>
+          <tbody>
+            {data?.map((b) => (
+              <tr key={b.id}>
+                <td className="mono">{b.build}</td>
+                <td><StatusBadge status={b.status} /></td>
+                <td>{b.source}</td>
+                <td className="mono">{b.deployment}</td>
+                <td>{timeAgo(b.startedAt)}</td>
+                <td>{b.duration}</td>
+                <td><button className="small" onClick={() => void run({ action: 'build-logs', build: b.build })}>Log</button></td>
+              </tr>
+            ))}
+            {data?.length === 0 && <tr><td colSpan={7} className="muted">No builds in AWS yet. Local builds do not appear here.</td></tr>}
+            {loading && !data && <tr><td colSpan={7} className="muted">Loading...</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}

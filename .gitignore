@@ -10,3 +10,7 @@ packages/engine/.stage/
 apps/cli/assets/engine.zip
 apps/cli/assets/build.sh
 apps/cli/assets/domain-template.json
+apps/cli/assets/dashboard/
+apps/dashboard/.next/
+apps/dashboard/next-env.d.ts
+apps/dashboard/*.tsbuildinfo
