@@ -6,6 +6,7 @@ import { configureEnv, errorMessage, GlobalOptions } from './lib/aws.js';
 import { builds } from './commands/builds.js';
 import { deploy } from './commands/deploy.js';
 import { deleteProject } from './commands/delete.js';
+import { domainAdd, domainList, domainRemove, domainVerify } from './commands/domain.js';
 import { envImport, envList, envRemove, envSet } from './commands/env.js';
 import { destroy } from './commands/destroy.js';
 import { connect, disconnect, githubDeploy, rotateSecret } from './commands/github.js';
@@ -83,6 +84,35 @@ program
   .description('Show the log of a remote build (id as shown by `deployer builds`)')
   .option('-f, --follow', 'keep streaming until the build finishes')
   .action((build, opts) => logs(build, opts, globals()));
+
+const domain = program.command('domain').description('Serve a project on your own domain (certificate, distribution and DNS)');
+
+domain
+  .command('add <host>')
+  .description('Add a custom domain to a project (creates the certificate and distribution; DNS too, if the domain is in Route 53)')
+  .requiredOption('-p, --project <name>')
+  .option('--manual', 'print the DNS records instead of creating them, even if a Route 53 zone exists')
+  .option('--no-wait', 'do not wait for the certificate and DNS; rerun the command to continue')
+  .action((host, opts) => domainAdd(host, opts, globals()));
+
+domain
+  .command('ls')
+  .alias('list')
+  .description('List custom domains with their certificate and DNS state')
+  .option('-p, --project <name>')
+  .option('--json', 'machine-readable output')
+  .action((opts) => domainList(opts, globals()));
+
+domain
+  .command('verify <host>')
+  .description('Check what is in place for a domain and what is still missing')
+  .action((host) => domainVerify(host, globals()));
+
+domain
+  .command('rm <host>')
+  .description('Remove a custom domain: route, distribution, certificate and the DNS records this tool created')
+  .option('-y, --yes', 'skip the confirmation prompt')
+  .action((host, opts) => domainRemove(host, opts, globals()));
 
 const env = program.command('env').description('Build-time environment variables for remote and GitHub builds');
 

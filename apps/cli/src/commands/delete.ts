@@ -12,6 +12,7 @@ import {
 } from '@deployer/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { confirmByTyping } from '../lib/prompt.js';
+import { removeDomain } from '../lib/domains.js';
 import { deleteParamsUnder } from '../lib/ssm.js';
 import { removeRepoWebhook } from '../lib/webhooks.js';
 
@@ -44,6 +45,7 @@ export async function deleteProject(opts: DeleteOptions, global: GlobalOptions):
   if (routes.length === 0) console.log('  not live anywhere, so no site is affected');
   const envCount = (manifest.env?.production.length ?? 0) + (manifest.env?.preview.length ?? 0);
   if (envCount > 0) console.log(`  ${envCount} environment variable${envCount === 1 ? '' : 's'} will be deleted`);
+  for (const d of manifest.domains ?? []) console.log(`  custom domain ${d}: its distribution, certificate and DNS records made by this tool will be removed`);
   if (manifest.source) console.log(`  deploys from ${manifest.source.repo}@${manifest.source.branch}: its GitHub connection will be removed`);
 
   if (opts.dryRun) {
@@ -54,6 +56,9 @@ export async function deleteProject(opts: DeleteOptions, global: GlobalOptions):
     console.log('Aborted.');
     return;
   }
+
+  // Custom domains first: their distributions would otherwise be left pointing at a deleted project.
+  for (const d of manifest.domains ?? []) for (const line of await removeDomain(out, global, d)) console.log(line);
 
   // Routes first so nothing serves a half-deleted project; history last so an interrupted run can be repeated.
   for (const r of routes) await deleteRoute(out.kvsArn, r.host);

@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { DEFAULT_KEEP, newDeploymentId, s3, startBuild } from '@deployer/core';
+import { DEFAULT_KEEP, newDeploymentId, readManifest, resolveTargetHosts, s3, startBuild } from '@deployer/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { projectBuildEnv } from '../lib/build-env.js';
 import { detectFramework } from '../lib/build.js';
@@ -22,7 +22,8 @@ export async function remoteDeploy(dirArg: string, opts: DeployOptions, global: 
   if (!out.buildProject || !out.buildsBucket) {
     throw new Error('This stack has no build support yet. Run `deployer init` to add it.');
   }
-  const host = (opts.host ?? out.domain).toLowerCase();
+  const explicit = opts.host ? [opts.host.toLowerCase()] : undefined;
+  const hosts = await resolveTargetHosts(out, project, (await readManifest(out.bucket, project)).domains, out.domain, explicit);
 
   const env = await projectBuildEnv(out.bucket, global.stackName, project);
   const { zip, files, skippedEnvFiles } = zipSource(dir);
@@ -41,12 +42,12 @@ export async function remoteDeploy(dirArg: string, opts: DeployOptions, global: 
   const buildId = await startBuild(out.buildProject, {
     project,
     id,
-    host: opts.host ? host : undefined,
+    hosts: explicit,
     keep,
     source: { type: 's3', key },
     installCommand: opts.installCommand,
     buildCommand: opts.buildCommand,
     env,
   });
-  await watchBuild(buildId, host, project, Boolean(opts.detach));
+  await watchBuild(buildId, hosts, project, Boolean(opts.detach));
 }

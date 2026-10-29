@@ -6,6 +6,7 @@ import { emptyBucket, envParamPrefix, listGithubConnections } from '@deployer/co
 import { cloudFormation, errorMessage, findStack, GlobalOptions, readOutputs } from '../lib/aws.js';
 import { confirmByTyping } from '../lib/prompt.js';
 import { deleteParamsUnder } from '../lib/ssm.js';
+import { listDomainStacks, removeDomain } from '../lib/domains.js';
 import { removeRepoWebhook } from '../lib/webhooks.js';
 
 export async function destroy(opts: { yes?: boolean }, global: GlobalOptions): Promise<void> {
@@ -24,6 +25,16 @@ export async function destroy(opts: { yes?: boolean }, global: GlobalOptions): P
   }
 
   const out = readOutputs(stack);
+
+  // Custom domains are separate stacks that read this stack's bucket; take them down first.
+  try {
+    for (const d of await listDomainStacks(global.stackName)) {
+      console.log(`Removing domain ${d.host}...`);
+      for (const line of await removeDomain(out, global, d.host)) console.log(`  ${line}`);
+    }
+  } catch (err) {
+    console.warn(`Could not remove custom domains (${errorMessage(err)}); remove them with \`deployer domain rm <host>\` before destroying.`);
+  }
 
   // Once the stack is gone its webhook URL is dead, so take the webhooks off the repositories first.
   try {

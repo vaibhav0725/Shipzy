@@ -1,12 +1,11 @@
 # Runs inside CodeBuild for every deploy. Inputs arrive as environment variables:
 #   fixed by the stack:  SITES_BUCKET BUILDS_BUCKET ENGINE_FUNCTION GITHUB_TOKEN_SECRET DEFAULT_HOST
-#   per build:           DEPLOY_PROJECT DEPLOY_ID [DEPLOY_HOST] [DEPLOY_KEEP]
+#   per build:           DEPLOY_PROJECT DEPLOY_ID [DEPLOY_HOSTS] [DEPLOY_KEEP]   (hosts: comma-separated; default is decided by the engine)
 #                        SOURCE_TYPE (s3|github) SOURCE_S3_KEY | SOURCE_REPO SOURCE_REF
 #                        [INSTALL_COMMAND] [BUILD_COMMAND]
 set -euo pipefail
 
 : "${DEPLOY_PROJECT:?}" "${DEPLOY_ID:?}" "${SOURCE_TYPE:?}"
-HOST="${DEPLOY_HOST:-$DEFAULT_HOST}"
 SRC=/tmp/source
 mkdir -p "$SRC"
 
@@ -94,10 +93,10 @@ find "$OUT" -name '*.html' | while IFS= read -r f; do
 done
 FILES="$(find "$OUT" -type f | wc -l | tr -d ' ')"
 
-echo "==> Promoting $DEPLOY_PROJECT/$DEPLOY_ID on $HOST"
-PAYLOAD="$(jq -nc --arg project "$DEPLOY_PROJECT" --arg id "$DEPLOY_ID" --arg host "$HOST" \
+echo "==> Promoting $DEPLOY_PROJECT/$DEPLOY_ID"
+PAYLOAD="$(jq -nc --arg project "$DEPLOY_PROJECT" --arg id "$DEPLOY_ID" --arg hosts "${DEPLOY_HOSTS:-}" \
   --argjson keep "${DEPLOY_KEEP:-10}" --argjson files "$FILES" \
-  '{action:"promote",project:$project,id:$id,host:$host,keep:$keep,files:$files}')"
+  '{action:"promote",project:$project,id:$id,hosts:(if $hosts == "" then null else ($hosts | split(",")) end),keep:$keep,files:$files}')"
 INVOKED=1
 aws lambda invoke --function-name "$ENGINE_FUNCTION" --cli-read-timeout 300 --cli-binary-format raw-in-base64-out \
   --payload "$PAYLOAD" /tmp/promote.json > /tmp/invoke.json
@@ -106,4 +105,4 @@ if jq -e 'has("FunctionError")' /tmp/invoke.json > /dev/null; then
   echo "Promote failed."
   exit 1
 fi
-echo "==> Live: $(jq -r .url /tmp/promote.json)"
+echo "==> Live: $(jq -r '.urls | join(", ")' /tmp/promote.json)"

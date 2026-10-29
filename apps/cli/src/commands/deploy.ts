@@ -5,6 +5,8 @@ import {
   discardUpload,
   newDeploymentId,
   prune,
+  readManifest,
+  resolveTargetHosts,
   routeTarget,
   setRoute,
   updateManifest,
@@ -36,7 +38,13 @@ export async function deploy(dirArg: string, opts: DeployOptions, global: Global
   const project = resolveProject(dir, opts.project);
 
   const out = await getOutputs(global.stackName);
-  const host = (opts.host ?? out.domain).toLowerCase();
+  const hosts = await resolveTargetHosts(
+    out,
+    project,
+    (await readManifest(out.bucket, project)).domains,
+    out.domain,
+    opts.host ? [opts.host] : undefined,
+  );
 
   const { outDir, framework } = await build(dir, {
     skipBuild: opts.skipBuild ?? false,
@@ -54,9 +62,9 @@ export async function deploy(dirArg: string, opts: DeployOptions, global: Global
     files = await uploadDirectory(out.bucket, target, outDir);
     console.log(`Uploaded ${files} files as ${id}`);
     // Promote: edge routing first, then record it, so the manifest never claims more than is live.
-    await setRoute(out.kvsArn, host, target);
+    for (const host of hosts) await setRoute(out.kvsArn, host, target);
   } catch (err) {
-    const outcome = await discardUpload(out, host, target);
+    const outcome = await discardUpload(out, hosts, target);
     if (outcome === 'removed') console.error('Deploy failed; removed the partial upload.');
     if (outcome === 'failed') {
       console.error('Deploy failed and the partial upload could not be removed; `deployer prune` will clean it up.');
@@ -66,10 +74,10 @@ export async function deploy(dirArg: string, opts: DeployOptions, global: Global
 
   await updateManifest(out.bucket, project, (m) => {
     m.deployments.push({ id, createdAt: new Date().toISOString(), files });
-    m.live[host] = id;
+    for (const host of hosts) m.live[host] = id;
   });
 
-  console.log(`\nLive: https://${host}`);
+  console.log(`\nLive: ${hosts.map((h) => `https://${h}`).join(', ')}`);
   console.log('(Routing changes propagate to the edge in roughly 30 seconds.)');
 
   // Housekeeping must never fail a deploy that already succeeded.

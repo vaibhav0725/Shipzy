@@ -1,11 +1,9 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import {
   CloudFormationClient,
   CreateStackCommand,
   DeleteStackCommand,
-  DescribeStackEventsCommand,
   UpdateStackCommand,
   waitUntilStackCreateComplete,
   waitUntilStackDeleteComplete,
@@ -13,6 +11,8 @@ import {
 } from '@aws-sdk/client-cloudformation';
 import { HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { s3 } from '@deployer/core';
+import { assetPath as asset } from '../lib/assets.js';
+import { waitOrExplain } from '../lib/cfn.js';
 import {
   cloudFormation,
   engineKeyOf,
@@ -23,15 +23,6 @@ import {
   whoAmI,
 } from '../lib/aws.js';
 
-// The package keeps its assets in <package>/assets. This file runs from dist/commands/ (tsc build) or
-// dist/ (the single-file bundle), so look in both places.
-const asset = (name: string): string => {
-  for (const rel of [`../assets/${name}`, `../../assets/${name}`]) {
-    const file = fileURLToPath(new URL(rel, import.meta.url));
-    if (fs.existsSync(file)) return file;
-  }
-  return fileURLToPath(new URL(`../assets/${name}`, import.meta.url));
-};
 const MAX_WAIT_SECONDS = 1800;
 const BUILD_SCRIPT_KEY = 'scripts/build.sh';
 
@@ -152,23 +143,4 @@ async function printSummary(stackName: string): Promise<void> {
   console.log(`  Builds:       ${out.buildProject}`);
   console.log(`  Webhook URL:  ${out.webhookUrl}`);
   console.log('\nNext: deployer deploy <react-app-dir> --project <name>');
-}
-
-async function waitOrExplain(cfn: CloudFormationClient, stackName: string, wait: () => Promise<unknown>): Promise<void> {
-  try {
-    await wait();
-  } catch (err) {
-    const events = await cfn
-      .send(new DescribeStackEventsCommand({ StackName: stackName }))
-      .catch(() => undefined);
-    // The root cause is a resource that failed on its own; the rest are "cancelled" because it failed.
-    const failed = (events?.StackEvents ?? []).filter((e) => e.ResourceStatus?.endsWith('FAILED') && e.ResourceStatusReason);
-    const rootCauses = failed.filter((e) => !/cancel/i.test(e.ResourceStatusReason ?? ''));
-    const failures = (rootCauses.length ? rootCauses : failed)
-      .slice(0, 5)
-      .map((e) => `  ${e.LogicalResourceId}: ${e.ResourceStatusReason}`);
-    throw new Error(
-      failures.length ? `Stack operation failed:\n${failures.join('\n')}` : `Stack operation failed (${errorMessage(err).slice(0, 200)}).`,
-    );
-  }
 }

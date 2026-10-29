@@ -5,6 +5,8 @@ import {
   DEFAULT_KEEP,
   discardUpload,
   prune,
+  readManifest,
+  resolveTargetHosts,
   routeTarget,
   s3,
   setRoute,
@@ -16,6 +18,9 @@ export interface PromoteEvent {
   action: 'promote';
   project: string;
   id: string;
+  /** hosts to make live; when absent, the project's domains (else the CloudFront URL) */
+  hosts?: string[];
+  /** older callers send a single host */
   host?: string;
   keep?: number;
   /** number of files the build uploaded */
@@ -45,15 +50,22 @@ export async function promote(event: PromoteEvent) {
   assertProjectName(event.project);
   if (!ID_RE.test(event.id)) throw new Error(`Invalid deployment id "${event.id}"`);
 
-  const host = (event.host || env('DEFAULT_HOST')).toLowerCase();
+  const explicit = event.hosts?.length ? event.hosts : event.host ? [event.host] : undefined;
+  const hosts = await resolveTargetHosts(
+    site,
+    event.project,
+    (await readManifest(site.bucket, event.project)).domains,
+    env('DEFAULT_HOST'),
+    explicit,
+  );
   const target = routeTarget(event.project, event.id);
   const keep = Number.isInteger(event.keep) && event.keep! >= 1 ? event.keep! : DEFAULT_KEEP;
 
   try {
     await assertUploaded(site.bucket, target);
-    await setRoute(site.kvsArn, host, target);
+    for (const host of hosts) await setRoute(site.kvsArn, host, target);
   } catch (err) {
-    await discardUpload(site, host, target);
+    await discardUpload(site, hosts, target);
     throw err;
   }
 
@@ -61,7 +73,7 @@ export async function promote(event: PromoteEvent) {
     if (!m.deployments.some((d) => d.id === event.id)) {
       m.deployments.push({ id: event.id, createdAt: new Date().toISOString(), files: event.files });
     }
-    m.live[host] = event.id;
+    for (const host of hosts) m.live[host] = event.id;
   });
 
   // Housekeeping must never fail a deploy that already succeeded.
@@ -73,5 +85,6 @@ export async function promote(event: PromoteEvent) {
     console.warn('cleanup skipped', err);
   }
 
-  return { ok: true, project: event.project, id: event.id, host, url: `https://${host}`, pruned };
+  const urls = hosts.map((h) => `https://${h}`);
+  return { ok: true, project: event.project, id: event.id, hosts, url: urls[0], urls, pruned };
 }

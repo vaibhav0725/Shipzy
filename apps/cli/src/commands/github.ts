@@ -5,6 +5,7 @@ import {
   listGithubConnections,
   newDeploymentId,
   readManifest,
+  resolveTargetHosts,
   startBuild,
   updateManifest,
 } from '@deployer/core';
@@ -112,7 +113,8 @@ export async function githubDeploy(opts: { project: string; detach?: boolean }, 
   assertProjectName(opts.project);
   const out = await getOutputs(global.stackName);
   const stack = githubStack(out);
-  const { source } = await readManifest(out.bucket, opts.project);
+  const manifest = await readManifest(out.bucket, opts.project);
+  const { source } = manifest;
   if (source?.type !== 'github') {
     throw new Error(`"${opts.project}" is not connected to GitHub. Run: deployer github connect -p ${opts.project} --repo owner/name`);
   }
@@ -129,14 +131,15 @@ export async function githubDeploy(opts: { project: string; detach?: boolean }, 
   const buildId = await startBuild(stack.buildProject, {
     project: opts.project,
     id: newDeploymentId(),
-    host: source.host,
+    hosts: source.host ? [source.host] : undefined,
     keep: DEFAULT_KEEP,
     source: { type: 'github', repo: source.repo, sha },
     installCommand: source.installCommand,
     buildCommand: source.buildCommand,
     env: await projectBuildEnv(out.bucket, global.stackName, opts.project),
   });
-  await watchBuild(buildId, source.host ?? out.domain, opts.project, Boolean(opts.detach));
+  const hosts = await resolveTargetHosts(out, opts.project, manifest.domains, out.domain, source.host ? [source.host] : undefined);
+  await watchBuild(buildId, hosts, opts.project, Boolean(opts.detach));
 }
 
 export async function disconnect(opts: { project: string }, global: GlobalOptions): Promise<void> {

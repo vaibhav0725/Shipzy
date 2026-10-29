@@ -81,7 +81,7 @@ export async function webhook(event: FunctionUrlEvent) {
     const buildId = await startBuild(env('BUILD_PROJECT'), {
       project,
       id: newDeploymentId(),
-      host: source.host,
+      hosts: source.host ? [source.host] : undefined,
       keep: DEFAULT_KEEP,
       source: { type: 'github', repo: payload.repository!.full_name!, sha: payload.after },
       installCommand: source.installCommand,

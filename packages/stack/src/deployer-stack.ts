@@ -77,6 +77,19 @@ export class DeployerStack extends cdk.Stack {
       ],
     });
 
+    // Custom-domain distributions (see `deployer domain`) are separate stacks that read this bucket through the
+    // same Origin Access Control. The statement the origin adds names only the main distribution, so allow
+    // this account's distributions as well.
+    bucket.addToResourcePolicy(
+      new iam.PolicyStatement({
+        sid: 'AllowAccountDistributionsViaOac',
+        principals: [new iam.ServicePrincipal('cloudfront.amazonaws.com')],
+        actions: ['s3:GetObject'],
+        resources: [bucket.arnForObjects('*')],
+        conditions: { StringLike: { 'AWS:SourceArn': cdk.Stack.of(this).formatArn({ service: 'cloudfront', region: '', resource: 'distribution', resourceName: '*' }) } },
+      }),
+    );
+
     // ---- Builds: remote builds, GitHub webhook, and the engine that promotes a finished build ----
 
     // The Lambda code is a zip in the Builds bucket, uploaded by `deployer init` after the bucket
@@ -232,6 +245,10 @@ export class DeployerStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'DistributionId', { value: distribution.distributionId });
     new cdk.CfnOutput(this, 'DistributionDomain', { value: distribution.distributionDomainName });
     new cdk.CfnOutput(this, 'KeyValueStoreArn', { value: routes.keyValueStoreArn });
+    // What `deployer domain add` hands to a domain stack.
+    new cdk.CfnOutput(this, 'OriginDomainName', { value: bucket.bucketRegionalDomainName });
+    new cdk.CfnOutput(this, 'OacId', { value: oac!.attrId });
+    new cdk.CfnOutput(this, 'RouterFunctionArn', { value: router.functionArn });
     new cdk.CfnOutput(this, 'BuildsBucketName', { value: builds.bucketName });
     new cdk.CfnOutput(this, 'BuildProjectName', { value: project.projectName });
     new cdk.CfnOutput(this, 'EngineFunctionName', { value: engine.functionName });

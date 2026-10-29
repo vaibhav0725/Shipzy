@@ -22,6 +22,10 @@ export interface StackOutputs {
   webhookUrl?: string;
   webhookSecretArn?: string;
   githubTokenSecretArn?: string;
+  /** what a custom-domain stack reuses from this one */
+  originDomain?: string;
+  oacId?: string;
+  routerFunctionArn?: string;
 }
 
 const OK_STATUSES = new Set(['CREATE_COMPLETE', 'UPDATE_COMPLETE', 'UPDATE_ROLLBACK_COMPLETE']);
@@ -75,6 +79,9 @@ export function readOutputs(stack: { Outputs?: { OutputKey?: string; OutputValue
     webhookUrl: find('WebhookUrl'),
     webhookSecretArn: find('WebhookSecretArn'),
     githubTokenSecretArn: find('GithubTokenSecretArn'),
+    originDomain: find('OriginDomainName'),
+    oacId: find('OacId'),
+    routerFunctionArn: find('RouterFunctionArn'),
   };
 }
 

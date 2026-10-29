@@ -34,6 +34,8 @@ export interface Manifest {
   source?: GithubSource;
   /** names of the project's build-time environment variables (values are in SSM) */
   env?: ManifestEnv;
+  /** custom domains this project is served on (each has its own distribution; see `deployer domain`) */
+  domains?: string[];
 }
 
 export const MANIFEST_PREFIX = '.deployer/';
