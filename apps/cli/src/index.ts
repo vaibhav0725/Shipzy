@@ -3,11 +3,13 @@ import * as dns from 'node:dns';
 import * as net from 'node:net';
 import { Command } from 'commander';
 import { configureEnv, errorMessage, GlobalOptions } from './lib/aws.js';
+import { builds } from './commands/builds.js';
 import { deploy } from './commands/deploy.js';
 import { deleteProject } from './commands/delete.js';
 import { destroy } from './commands/destroy.js';
 import { init } from './commands/init.js';
 import { list } from './commands/list.js';
+import { logs } from './commands/logs.js';
 import { pruneCommand } from './commands/prune.js';
 import { rollback } from './commands/rollback.js';
 import { status } from './commands/status.js';
@@ -41,6 +43,8 @@ program
   .option('-p, --project <name>', 'project name (default: from package.json)')
   .option('--host <hostname>', 'host to serve on (default: the CloudFront domain)')
   .option('--skip-build', 'upload the existing dist/ or build/ folder as is')
+  .option('--remote', 'build in CodeBuild in your AWS account instead of on this machine')
+  .option('--detach', 'with --remote: start the build and return without waiting')
   .option('--install-command <cmd>', 'replace the install step, e.g. "npm ci --legacy-peer-deps"')
   .option('--build-command <cmd>', 'replace the build step (default: <package manager> run build)')
   .option('--keep <n>', 'deployments to retain per project (live ones are always kept)', String(DEFAULT_KEEP))
@@ -59,6 +63,20 @@ program
   .description('Show the account, stack, CloudFront URL and totals')
   .option('--json', 'machine-readable output')
   .action((opts) => status(opts, globals()));
+
+program
+  .command('builds')
+  .description('List recent remote builds')
+  .option('-p, --project <name>', 'only builds of this project')
+  .option('--limit <n>', 'how many to show', '10')
+  .option('--json', 'machine-readable output')
+  .action((opts) => builds(opts, globals()));
+
+program
+  .command('logs <build>')
+  .description('Show the log of a remote build (id as shown by `deployer builds`)')
+  .option('-f, --follow', 'keep streaming until the build finishes')
+  .action((build, opts) => logs(build, opts, globals()));
 
 program
   .command('rollback')
@@ -96,7 +114,7 @@ program
 // so exit explicitly once the command has finished.
 program
   .parseAsync()
-  .then(() => process.exit(0))
+  .then(() => process.exit(process.exitCode ?? 0))
   .catch((err) => {
     console.error(`Error: ${errorMessage(err)}`);
     process.exit(1);

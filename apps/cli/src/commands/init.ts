@@ -23,6 +23,7 @@ import {
 
 const asset = (name: string) => fileURLToPath(new URL(`../../assets/${name}`, import.meta.url));
 const MAX_WAIT_SECONDS = 1800;
+const BUILD_SCRIPT_KEY = 'scripts/build.sh';
 
 export async function init(opts: GlobalOptions): Promise<void> {
   const me = await whoAmI();
@@ -31,11 +32,12 @@ export async function init(opts: GlobalOptions): Promise<void> {
     console.warn('Warning: you are using root credentials. Prefer an IAM user or SSO profile.');
   }
 
-  for (const name of ['template.json', 'engine.zip']) {
+  for (const name of ['template.json', 'engine.zip', 'build.sh']) {
     if (!fs.existsSync(asset(name))) throw new Error(`${name} is missing; run \`npm run build\` at the repo root.`);
   }
   const templateBody = fs.readFileSync(asset('template.json'), 'utf8');
   const engineZip = fs.readFileSync(asset('engine.zip'));
+  const buildScript = fs.readFileSync(asset('build.sh'));
   const engineKey = `engine/${createHash('sha256').update(engineZip).digest('hex').slice(0, 16)}.zip`;
 
   console.log(
@@ -58,6 +60,24 @@ export async function init(opts: GlobalOptions): Promise<void> {
   if (!exists) {
     console.log(`Uploading engine code (${(engineZip.length / 1048576).toFixed(1)} MB)...`);
     await client.send(new PutObjectCommand({ Bucket: out.buildsBucket, Key: engineKey, Body: engineZip }));
+  }
+
+  // The build script has a fixed key (CodeBuild fetches it by name), so compare content to skip no-op uploads.
+  const scriptSha = createHash('sha256').update(buildScript).digest('hex');
+  const stored = await client
+    .send(new HeadObjectCommand({ Bucket: out.buildsBucket, Key: BUILD_SCRIPT_KEY }))
+    .catch(() => undefined);
+  if (stored?.Metadata?.['sha256'] !== scriptSha) {
+    console.log('Updating the build script...');
+    await client.send(
+      new PutObjectCommand({
+        Bucket: out.buildsBucket,
+        Key: BUILD_SCRIPT_KEY,
+        Body: buildScript,
+        ContentType: 'text/x-shellscript',
+        Metadata: { sha256: scriptSha },
+      }),
+    );
   }
 
   // 3. Point the stack's Lambda functions at it.

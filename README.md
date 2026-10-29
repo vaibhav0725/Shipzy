@@ -18,6 +18,9 @@ export AWS_PROFILE=deployer-dev   # use an IAM user or SSO profile, not root
 ```sh
 npm run deployer -- init                                   # create the stack (~5 min)
 npm run deployer -- deploy ./my-react-app --project demo   # build, upload, promote
+npm run deployer -- deploy ./my-react-app --remote         # build in CodeBuild in your AWS account instead
+npm run deployer -- builds                                 # recent remote builds
+npm run deployer -- logs <build> -f                        # a build's log (id from `builds`)
 npm run deployer -- status                                 # account, stack, URL, totals
 npm run deployer -- list                                   # all projects: live host, version, size
 npm run deployer -- list --project demo                    # one project's deployments
@@ -30,6 +33,13 @@ npm run deployer -- destroy                                # remove everything
 `list` and `status` accept `--json` for scripting.
 
 Global options: `--profile`, `--region` (default `us-east-1`), `--stack-name` (default `Deployer`).
+
+## Remote builds
+`deploy --remote` zips your source (honouring `.gitignore`; never `node_modules`, `dist`, `build` or `.env*`),
+uploads it to your account, and builds it in CodeBuild, then streams the log. Add `--detach` to return at once and
+follow later with `logs <build> -f`. Ctrl-C stops watching, not the build. Remote builds take about 1.5 minutes
+before your own build even starts (CodeBuild provisioning), so the local `deploy` stays the fast option while
+iterating. Build-time environment variables (`.env` files) are not supported in remote builds yet.
 
 ## Storage cleanup
 Every deploy is a full, immutable copy, so the CLI keeps storage bounded:

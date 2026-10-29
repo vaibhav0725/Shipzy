@@ -1,6 +1,5 @@
 import * as path from 'node:path';
 import {
-  assertProjectName,
   DEFAULT_GRACE_MINUTES,
   DEFAULT_KEEP,
   discardUpload,
@@ -11,8 +10,10 @@ import {
   updateManifest,
 } from '@deployer/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
-import { build, readPackageJson } from '../lib/build.js';
+import { build } from '../lib/build.js';
+import { parseKeep, resolveProject } from '../lib/project.js';
 import { uploadDirectory } from '../lib/upload.js';
+import { remoteDeploy } from './remote-deploy.js';
 
 export interface DeployOptions {
   project?: string;
@@ -21,15 +22,18 @@ export interface DeployOptions {
   installCommand?: string;
   buildCommand?: string;
   keep?: string;
+  /** build in CodeBuild in the user's account instead of on this machine */
+  remote?: boolean;
+  /** with --remote: start the build and return without waiting */
+  detach?: boolean;
 }
 
-const sanitize = (s: string) =>
-  s.toLowerCase().replace(/^@[^/]+\//, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
-
 export async function deploy(dirArg: string, opts: DeployOptions, global: GlobalOptions): Promise<void> {
+  if (opts.remote) return remoteDeploy(dirArg, opts, global);
+  if (opts.detach) throw new Error('--detach only applies to remote builds (add --remote).');
+
   const dir = path.resolve(dirArg);
-  const project = opts.project ?? sanitize(readPackageJson(dir).name ?? path.basename(dir));
-  assertProjectName(project);
+  const project = resolveProject(dir, opts.project);
 
   const out = await getOutputs(global.stackName);
   const host = (opts.host ?? out.domain).toLowerCase();
@@ -41,8 +45,7 @@ export async function deploy(dirArg: string, opts: DeployOptions, global: Global
   });
   console.log(`Deploying ${project} (${framework}) from ${path.relative(process.cwd(), outDir) || outDir}`);
 
-  const keep = Number(opts.keep ?? DEFAULT_KEEP);
-  if (!Number.isInteger(keep) || keep < 1) throw new Error('--keep must be a whole number >= 1.');
+  const keep = parseKeep(opts.keep, DEFAULT_KEEP);
 
   const id = newDeploymentId();
   const target = routeTarget(project, id);

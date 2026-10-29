@@ -8,3 +8,4 @@ apps/cli/assets/template.json
 
 packages/engine/.stage/
 apps/cli/assets/engine.zip
+apps/cli/assets/build.sh

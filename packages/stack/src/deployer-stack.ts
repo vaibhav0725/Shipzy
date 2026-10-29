@@ -1,4 +1,3 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as cdk from 'aws-cdk-lib';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
@@ -146,7 +145,11 @@ export class DeployerStack extends cdk.Stack {
       env: { shell: 'bash' },
       phases: {
         install: { 'runtime-versions': { nodejs: 22 } },
-        build: { commands: [fs.readFileSync(path.resolve(__dirname, '../edge/build.sh'), 'utf8')] },
+        // The script lives in the Builds bucket (uploaded by `deployer init`) so CodeBuild never echoes
+        // it into build logs or failure messages.
+        build: {
+          commands: ['aws s3 cp "s3://$BUILDS_BUCKET/scripts/build.sh" /tmp/build.sh --only-show-errors', 'bash /tmp/build.sh'],
+        },
       },
     });
     const project = new codebuild.Project(this, 'Build', {
@@ -175,6 +178,7 @@ export class DeployerStack extends cdk.Stack {
     });
     bucket.grantReadWrite(project);
     builds.grantRead(project, 'src/*');
+    builds.grantRead(project, 'scripts/*');
     engine.grantInvoke(project);
     githubToken.grantRead(project);
 

@@ -15,3 +15,6 @@ const out = path.resolve(__dirname, '../../../apps/cli/assets/template.json');
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, JSON.stringify(template) + '\n');
 console.log(`Wrote ${path.relative(process.cwd(), out)}`);
+
+// The build script is uploaded to the Builds bucket by `deployer init`, so it travels with the CLI.
+fs.copyFileSync(path.resolve(__dirname, '../edge/build.sh'), path.resolve(path.dirname(out), 'build.sh'));
