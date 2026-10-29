@@ -3,10 +3,10 @@ import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { DEFAULT_KEEP, newDeploymentId, s3, startBuild } from '@deployer/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { detectFramework } from '../lib/build.js';
-import { describeFailure, duration, streamLogs } from '../lib/builds.js';
 import { formatBytes } from '../lib/format.js';
 import { parseKeep, resolveProject } from '../lib/project.js';
 import { zipSource } from '../lib/source-zip.js';
+import { watchBuild } from '../lib/watch.js';
 import type { DeployOptions } from './deploy.js';
 
 /** Builds in CodeBuild in the user's account instead of on this machine. */
@@ -44,22 +44,5 @@ export async function remoteDeploy(dirArg: string, opts: DeployOptions, global: 
     installCommand: opts.installCommand,
     buildCommand: opts.buildCommand,
   });
-  const short = buildId.split(':').pop()!.slice(0, 8);
-  console.log(`Started build ${short} for ${project} (${id})\n`);
-
-  if (opts.detach) {
-    console.log(`Follow it:  deployer logs ${short} -f\nAll builds: deployer builds -p ${project}`);
-    return;
-  }
-
-  // Ctrl-C stops watching, not the build.
-  process.once('SIGINT', () => {
-    console.log(`\nStopped watching. The build keeps running; follow it with: deployer logs ${short} -f`);
-    process.exit(130);
-  });
-  const finished = await streamLogs(buildId, true);
-  if (finished.buildStatus !== 'SUCCEEDED') throw new Error(describeFailure(finished));
-
-  console.log(`\nLive: https://${host}  (build took ${duration(finished)})`);
-  console.log('(Routing changes propagate to the edge in roughly 30 seconds.)');
+  await watchBuild(buildId, host, project, Boolean(opts.detach));
 }

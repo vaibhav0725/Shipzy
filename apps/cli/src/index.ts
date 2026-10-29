@@ -7,6 +7,7 @@ import { builds } from './commands/builds.js';
 import { deploy } from './commands/deploy.js';
 import { deleteProject } from './commands/delete.js';
 import { destroy } from './commands/destroy.js';
+import { connect, disconnect, githubDeploy } from './commands/github.js';
 import { init } from './commands/init.js';
 import { list } from './commands/list.js';
 import { logs } from './commands/logs.js';
@@ -77,6 +78,33 @@ program
   .description('Show the log of a remote build (id as shown by `deployer builds`)')
   .option('-f, --follow', 'keep streaming until the build finishes')
   .action((build, opts) => logs(build, opts, globals()));
+
+const github = program.command('github').description('Deploy a project automatically when its GitHub repository is pushed to');
+
+github
+  .command('connect')
+  .description('Connect a project to a repository and register the push webhook')
+  .requiredOption('-p, --project <name>')
+  .requiredOption('--repo <owner/name>', 'repository to deploy from')
+  .option('--branch <name>', 'branch to deploy (default: the repository default branch)')
+  .option('--host <hostname>', 'host to deploy to (default: the CloudFront domain)')
+  .option('--install-command <cmd>', 'replace the install step for these builds')
+  .option('--build-command <cmd>', 'replace the build step for these builds')
+  .option('--reuse-token', 'use the GitHub token already stored in your account instead of asking for one')
+  .action((opts) => connect(opts, globals()));
+
+github
+  .command('deploy')
+  .description('Build the current head of the connected branch now')
+  .requiredOption('-p, --project <name>')
+  .option('--detach', 'start the build and return without waiting')
+  .action((opts) => githubDeploy(opts, globals()));
+
+github
+  .command('disconnect')
+  .description('Stop deploying a project from GitHub and remove its webhook')
+  .requiredOption('-p, --project <name>')
+  .action((opts) => disconnect(opts, globals()));
 
 program
   .command('rollback')

@@ -4,6 +4,7 @@ import {
   deletePrefix,
   deleteRoute,
   listDeploymentIds,
+  listManifestProjects,
   listRoutes,
   readManifest,
 } from '@deployer/core';
@@ -21,14 +22,16 @@ export async function deleteProject(opts: DeleteOptions, global: GlobalOptions):
   assertProjectName(project);
   const out = await getOutputs(global.stackName);
 
-  const [manifest, folders, allRoutes] = await Promise.all([
+  const [manifest, folders, allRoutes, known] = await Promise.all([
     readManifest(out.bucket, project),
     listDeploymentIds(out.bucket, project),
     listRoutes(out.kvsArn),
+    listManifestProjects(out.bucket),
   ]);
   const routes = allRoutes.filter((r) => r.target.startsWith(`${project}/`));
 
-  if (manifest.deployments.length === 0 && folders.length === 0 && routes.length === 0) {
+  // A project connected to GitHub but never deployed has only a history file.
+  if (!known.includes(project) && manifest.deployments.length === 0 && folders.length === 0 && routes.length === 0) {
     throw new Error(`Project "${project}" not found. See \`deployer list\`.`);
   }
 

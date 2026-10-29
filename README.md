@@ -21,6 +21,9 @@ npm run deployer -- deploy ./my-react-app --project demo   # build, upload, prom
 npm run deployer -- deploy ./my-react-app --remote         # build in CodeBuild in your AWS account instead
 npm run deployer -- builds                                 # recent remote builds
 npm run deployer -- logs <build> -f                        # a build's log (id from `builds`)
+npm run deployer -- github connect -p demo --repo owner/name   # deploy on every push (asks for a GitHub token)
+npm run deployer -- github deploy -p demo                  # build the connected branch's current head now
+npm run deployer -- github disconnect -p demo
 npm run deployer -- status                                 # account, stack, URL, totals
 npm run deployer -- list                                   # all projects: live host, version, size
 npm run deployer -- list --project demo                    # one project's deployments
@@ -40,6 +43,21 @@ uploads it to your account, and builds it in CodeBuild, then streams the log. Ad
 follow later with `logs <build> -f`. Ctrl-C stops watching, not the build. Remote builds take about 1.5 minutes
 before your own build even starts (CodeBuild provisioning), so the local `deploy` stays the fast option while
 iterating. Build-time environment variables (`.env` files) are not supported in remote builds yet.
+
+## GitHub push deploys
+`github connect` stores a GitHub token in your account (Secrets Manager), registers a push webhook on the repository,
+and remembers the repo and branch for the project. A push then reaches the webhook Lambda, which builds that commit in
+CodeBuild and promotes it, exactly like `deploy --remote`.
+
+- **Token:** a fine-grained token with *Contents: read* and *Webhooks: read and write* on the repository (or a classic
+  token with `repo` and `admin:repo_hook`). Pass it as `GITHUB_TOKEN` or type it when asked (input is hidden). It is
+  validated before anything is stored. One token serves the whole account; `--reuse-token` skips asking again.
+- **Webhook security:** the Function URL is public by design. Every request must carry GitHub's HMAC signature, made
+  with a secret generated in your account, or it gets a 401 and starts nothing.
+- **Several projects can follow one repo**, each on its own branch or host; the webhook is shared and removed with the
+  last project. `--branch`, `--host`, `--install-command` and `--build-command` are saved per project.
+- If the CLI cannot register the webhook (for example a token without webhook permission), it prints the exact
+  settings to enter by hand.
 
 ## Storage cleanup
 Every deploy is a full, immutable copy, so the CLI keeps storage bounded:

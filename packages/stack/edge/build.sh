@@ -20,8 +20,14 @@ case "$SOURCE_TYPE" in
     # The token goes in a request header, never in the URL, so it cannot leak into error output.
     TOKEN="$(aws secretsmanager get-secret-value --secret-id "$GITHUB_TOKEN_SECRET" --query SecretString --output text)"
     AUTH="Authorization: Basic $(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)"
+    export GIT_TERMINAL_PROMPT=0   # fail instead of asking for a username
     git -C "$SRC" init -q
-    git -C "$SRC" -c "http.extraHeader=$AUTH" fetch -q --depth 1 "https://github.com/${SOURCE_REPO:?}.git" "${SOURCE_REF:?}"
+    if ! git -C "$SRC" -c "http.extraHeader=$AUTH" fetch -q --depth 1 "https://github.com/${SOURCE_REPO:?}.git" "${SOURCE_REF:?}"; then
+      echo "Could not fetch ${SOURCE_REPO} at ${SOURCE_REF:0:7}."
+      echo "Check that the repository exists and that the stored GitHub token can read it."
+      echo "(Store a new token with: deployer github connect -p <project> --repo ${SOURCE_REPO})"
+      exit 1
+    fi
     git -C "$SRC" checkout -q FETCH_HEAD
     ;;
   *)
