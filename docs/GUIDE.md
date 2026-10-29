@@ -754,7 +754,7 @@ table uses a pure-JavaScript implementation, so nothing native is installed or s
 | Build-time environment variables (production and preview scopes) | done |
 | Local dashboard (`deployer dashboard`): deploy from a folder or GitHub, rollback, domains, variables, live logs | done, driven through its API against a real account |
 | Custom domains: Route 53 automatic and manual DNS, side-by-side projects, removal | done, on a real delegated subdomain |
-| Pull request previews: wildcard domain, webhook, engine, comment, `previews` commands, dashboard tab | built; wildcard domain and the webhook-to-build path verified live, a real pull request not yet |
+| Pull request previews: wildcard domain, webhook, engine, comment, `previews` commands, dashboard tab | done, including a real pull request: open, push again, close |
 
 **Next (planned):**
 
