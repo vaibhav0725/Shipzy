@@ -13,5 +13,5 @@ const stack = new DeployerStack(app, 'Deployer', {
 const template = app.synth().getStackByName(stack.stackName).template;
 const out = path.resolve(__dirname, '../../../apps/cli/assets/template.json');
 fs.mkdirSync(path.dirname(out), { recursive: true });
-fs.writeFileSync(out, JSON.stringify(template, null, 2) + '\n');
+fs.writeFileSync(out, JSON.stringify(template) + '\n');
 console.log(`Wrote ${path.relative(process.cwd(), out)}`);

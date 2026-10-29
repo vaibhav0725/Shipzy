@@ -1,4 +1,4 @@
-import { findStack, GlobalOptions, readOutputs, whoAmI } from '../lib/aws.js';
+import { engineKeyOf, findStack, GlobalOptions, readOutputs, whoAmI } from '../lib/aws.js';
 import { formatBytes } from '../lib/format.js';
 import { listProjects } from '../lib/projects.js';
 
@@ -16,6 +16,7 @@ export async function status(opts: { json?: boolean }, global: GlobalOptions): P
     stack: { name: global.stackName, status: stack.StackStatus, updated: stack.LastUpdatedTime ?? stack.CreationTime },
     bucket: out.bucket,
     distribution: { id: out.distributionId, url: `https://${out.domain}` },
+    builds: { project: out.buildProject, engine: Boolean(engineKeyOf(stack)), webhookUrl: out.webhookUrl },
     projects: projects.length,
     deployments: projects.reduce((n, p) => n + p.versions, 0),
     liveSites: projects.reduce((n, p) => n + p.live.length, 0),
@@ -29,6 +30,8 @@ export async function status(opts: { json?: boolean }, global: GlobalOptions): P
     ['Stack', `${summary.stack.name}  ${summary.stack.status}`],
     ['Bucket', summary.bucket],
     ['CloudFront', `${summary.distribution.id}  ${summary.distribution.url}`],
+    ['Builds', summary.builds.engine ? `${out.buildProject} (engine installed)` : 'not set up: run `deployer init`'],
+    ['Webhook', out.webhookUrl ?? '-'],
     ['Projects', `${summary.projects} (${summary.liveSites} live)`],
     ['Deployments', `${summary.deployments} stored, ${formatBytes(summary.bytes)}`],
   ];

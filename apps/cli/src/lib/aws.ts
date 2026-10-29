@@ -15,6 +15,13 @@ export interface StackOutputs {
   distributionId: string;
   domain: string;
   kvsArn: string;
+  /** Remote builds; absent on a stack created before they existed (run `deployer init` to add them). */
+  buildsBucket?: string;
+  buildProject?: string;
+  engineFunction?: string;
+  webhookUrl?: string;
+  webhookSecretArn?: string;
+  githubTokenSecretArn?: string;
 }
 
 const OK_STATUSES = new Set(['CREATE_COMPLETE', 'UPDATE_COMPLETE', 'UPDATE_ROLLBACK_COMPLETE']);
@@ -51,8 +58,9 @@ export async function findStack(stackName: string) {
 }
 
 export function readOutputs(stack: { Outputs?: { OutputKey?: string; OutputValue?: string }[] }): StackOutputs {
+  const find = (key: string) => stack.Outputs?.find((o) => o.OutputKey === key)?.OutputValue;
   const get = (key: string): string => {
-    const value = stack.Outputs?.find((o) => o.OutputKey === key)?.OutputValue;
+    const value = find(key);
     if (!value) throw new Error(`Stack is missing output ${key}; try \`deployer init\` again.`);
     return value;
   };
@@ -61,7 +69,18 @@ export function readOutputs(stack: { Outputs?: { OutputKey?: string; OutputValue
     distributionId: get('DistributionId'),
     domain: get('DistributionDomain'),
     kvsArn: get('KeyValueStoreArn'),
+    buildsBucket: find('BuildsBucketName'),
+    buildProject: find('BuildProjectName'),
+    engineFunction: find('EngineFunctionName'),
+    webhookUrl: find('WebhookUrl'),
+    webhookSecretArn: find('WebhookSecretArn'),
+    githubTokenSecretArn: find('GithubTokenSecretArn'),
   };
+}
+
+/** The engine zip the stack currently runs ("" until `init` has installed one). */
+export function engineKeyOf(stack: { Parameters?: { ParameterKey?: string; ParameterValue?: string }[] }): string | undefined {
+  return stack.Parameters?.find((p) => p.ParameterKey === 'EngineKey')?.ParameterValue;
 }
 
 export async function getOutputs(stackName: string): Promise<StackOutputs> {

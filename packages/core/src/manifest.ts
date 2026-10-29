@@ -17,6 +17,11 @@ export interface GithubSource {
   /** "owner/name" */
   repo: string;
   branch: string;
+  /** host to promote to; default is the CloudFront domain */
+  host?: string;
+  /** replace the detected install/build step, as with `deploy --install-command` */
+  installCommand?: string;
+  buildCommand?: string;
 }
 
 export interface Manifest {

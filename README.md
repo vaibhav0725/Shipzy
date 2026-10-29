@@ -40,12 +40,23 @@ Every deploy is a full, immutable copy, so the CLI keeps storage bounded:
   Unrecorded uploads younger than `--grace-minutes` (default 60) are left alone in case a deploy is running.
 
 ## How it works
+- `packages/core`: code shared by the CLI and the Lambdas (routing table, deployment history, pruning).
 - `packages/stack`: CDK app. `npm run build` synthesizes it to `apps/cli/assets/template.json`.
   It has no file assets, so no `cdk bootstrap` is needed; the CLI deploys the template directly with CloudFormation.
+- `packages/engine`: two Lambda functions, bundled to `apps/cli/assets/engine.zip`. `deployer init` uploads the
+  zip to the Builds bucket and points the stack at it. `promote` publishes a finished build; `webhook` receives
+  GitHub push events (the public URL is protected by an HMAC signature, not by being secret).
 - `apps/cli`: builds the React app locally, uploads it to `s3://<bucket>/<project>/<deployment-id>/`,
   then points `host:<hostname>` in the KeyValueStore at that prefix. A CloudFront Function
   (`packages/stack/edge/router.js`) rewrites each request using that mapping and falls back to
   `index.html` for client-side routes.
+
+## What `init` creates in your account
+The three original resources (private S3 bucket, CloudFront distribution, KeyValueStore) plus the pieces for
+builds in AWS: a CodeBuild project, a Builds bucket (uploaded sources expire after 7 days), the two Lambdas,
+two secrets, and three IAM roles for CodeBuild, the engine and the webhook. Each role is limited to this stack's
+own buckets, routing table, build project and secrets. `init` needs `CAPABILITY_IAM` and is safe to rerun.
+Logs are kept for 14 days. CodeBuild's free tier is 100 build-minutes a month.
 
 Until custom domains land, a project is served at the CloudFront domain, so the last project deployed
 to the default host wins; use `--host` to serve several projects.

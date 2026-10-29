@@ -5,3 +5,6 @@ apps/cli/assets/template.json
 *.log
 .DS_Store
 .env
+
+packages/engine/.stage/
+apps/cli/assets/engine.zip
