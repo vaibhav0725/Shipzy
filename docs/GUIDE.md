@@ -1,0 +1,601 @@
+# deployer: the complete guide
+
+An open-source, bring-your-own-AWS deployer for static React apps. You point a command-line tool at **your own AWS
+account**, and it publishes React projects there: files in S3, served worldwide by CloudFront, with instant rollback,
+builds that can run in your account, and automatic deploys when you push to GitHub.
+
+`deployer` is a working name. Nothing here runs on a server we operate: the only software outside your AWS account is
+the CLI on your machine.
+
+**Contents**
+
+1. [What it is, and what it is not](#1-what-it-is-and-what-it-is-not)
+2. [How it works](#2-how-it-works)
+3. [Features](#3-features)
+4. [Getting started](#4-getting-started)
+5. [Using it day to day](#5-using-it-day-to-day)
+6. [Command reference](#6-command-reference)
+7. [What your project needs](#7-what-your-project-needs)
+8. [What gets created in your AWS account](#8-what-gets-created-in-your-aws-account)
+9. [Security model](#9-security-model)
+10. [Limits and known issues](#10-limits-and-known-issues)
+11. [Troubleshooting](#11-troubleshooting)
+12. [The repository, and working on it](#12-the-repository-and-working-on-it)
+13. [Status and roadmap](#13-status-and-roadmap)
+
+---
+
+## 1. What it is, and what it is not
+
+**It is** a tool that deploys static React apps (Vite or Create React App) to infrastructure you own:
+
+- You keep your AWS bill, your data and your credentials. The tool is a thin layer of code and AWS resources.
+- A deploy produces an immutable copy of your site. Going live, and going back, is a single small update.
+- You can build on your own machine (fast) or inside your AWS account (reproducible, and needed for GitHub).
+
+**It is not (yet)**: a hosted service, a dashboard, or a Next.js host. Custom domains and pull-request preview URLs
+are not built. See [section 13](#13-status-and-roadmap).
+
+---
+
+## 2. How it works
+
+### 2.1 The big picture
+
+```
+ YOUR MACHINE                          YOUR AWS ACCOUNT
+ ────────────                          ────────────────────────────────────────────────────────────
+
+                                       ┌──────────────┐      ┌───────────────────────────────┐
+ deployer CLI ── local deploy ───────▶ │ S3 "sites"   │ ◀──┐ │ CloudFront                    │ ◀── visitors
+   │                                   │ <project>/   │    │ │  router function              │
+   │  --remote: zip source             │  <deploy-id>/│    └─│  (reads the routing table,    │
+   ├──────────────▶ S3 "builds" ──┐    └──────────────┘      │   rewrites the path)          │
+   │                              ▼          ▲               └───────────────▲───────────────┘
+   │  start build           ┌───────────┐    │ upload dist/                  │ host → deployment
+   └──────────────────────▶ │ CodeBuild │ ───┘                               │
+                            └─────┬─────┘                            ┌───────┴────────┐
+ GitHub push ─▶ Webhook Lambda ───┘ start build                      │ KeyValueStore  │
+  (signature checked)                                                │ (routing table)│
+                                  CodeBuild ─▶ Engine Lambda ──────▶ └────────────────┘
+                                               "promote": set route, record history, prune
+```
+
+### 2.2 The three ideas everything is built on
+
+**1. Every deploy is an immutable folder.** A deployment is stored at `s3://<sites-bucket>/<project>/<deployment-id>/`,
+and is never edited afterwards. Deployment ids look like `d-20261029T104746-19fff9` (a UTC timestamp and a random
+suffix).
+
+**2. One small table decides what is live.** A CloudFront *KeyValueStore* maps a hostname to a deployment:
+`host:<hostname>` → `<project>/<deployment-id>`. Making a deployment live is writing one entry. Rolling back is
+writing a different one. No files are copied and the CloudFront distribution is not touched.
+
+**3. A router function does the lookup on every request.** A small CloudFront Function reads the table, then rewrites
+the request path so S3 serves the right folder.
+
+### 2.3 What happens to a visitor's request
+
+1. The browser asks for `/about` on your site's hostname.
+2. The router function looks up the hostname in the routing table, for example `demo/d-20261028T213343-f4abfb`.
+3. It rewrites the path to point inside that folder. A path whose last segment has no `.` (such as `/about`, or `/`)
+   becomes `/index.html`, so client-side routes such as React Router's `BrowserRouter` work on a page refresh.
+   A path with an extension (`/assets/app.js`) is a real file and is kept.
+4. CloudFront checks its cache, keyed by the **rewritten** path. A hit is served immediately. On a miss, it reads the
+   file from the private S3 bucket (through an Origin Access Control, so the bucket is never public).
+5. If no deployment is live for that hostname, the function returns a plain-text 404.
+
+Because the cache key contains the deployment id, a rollback can never serve stale files from the other version.
+
+### 2.4 Three ways to start a deploy
+
+| | Where the build runs | Who finishes the job |
+|---|---|---|
+| `deploy <dir>` (local) | Your machine, with your Node and package manager | The CLI uploads, sets the route, records history, prunes |
+| `deploy <dir> --remote` | CodeBuild in your account | The **engine** Lambda |
+| A push to a connected GitHub branch | CodeBuild in your account | The **engine** Lambda |
+
+**Local deploy.** Detects the package manager, installs, runs `build`, finds `dist/` or `build/`, uploads it as a new
+folder, sets the route, records the deployment, and prunes old ones.
+
+**Remote deploy.** Zips your source, uploads the zip to the *builds* bucket, and starts a CodeBuild build. The build
+unzips it, installs, builds, uploads the output, and calls the engine to promote it. The CLI streams the log to your
+terminal.
+
+**GitHub deploy.** A push reaches the **webhook** Lambda. It checks GitHub's signature, finds the projects connected
+to that repository and branch, and starts a build for each, from that exact commit. From there it is the same as a
+remote deploy.
+
+The engine does exactly what the local CLI does after a build: set the route, record the deployment, prune. They share
+the same code (`packages/core`).
+
+### 2.5 What a deploy guarantees
+
+- **Nothing changes until the very end.** A new folder is fully uploaded before any route moves.
+- **A failed build changes nothing.** The route is untouched. A partial upload is removed, unless the route already
+  points at it (then deleting would take a live site down, so it is left alone).
+- **Concurrent deploys are safe.** Both the history file (S3 conditional writes) and the routing table (re-read and
+  retry on conflict) are written with optimistic locking, so simultaneous deploys or builds do not lose updates.
+- **Storage stays bounded.** After each deploy, only the newest 10 deployments are kept (plus anything a host routes
+  to). Uploads that never completed are swept up after a one-hour grace period.
+
+### 2.6 Where state lives
+
+| State | Where |
+|---|---|
+| The site files | `s3://<sites>/<project>/<deployment-id>/…` |
+| Which deployment is live for a host | The KeyValueStore: `host:<hostname>` → `<project>/<id>` |
+| Deployment history, and a project's GitHub connection | `s3://<sites>/.deployer/<project>.json` |
+| Uploaded sources for remote builds (deleted after 7 days) | `s3://<builds>/src/<project>/<id>.zip` |
+| The engine code and the build script | `s3://<builds>/engine/…` and `scripts/build.sh` |
+| GitHub token and webhook signing secret | AWS Secrets Manager (two secrets) |
+
+There is no database. The routing table is the source of truth for what visitors see; the history file is the source
+of truth for what can be rolled back to.
+
+---
+
+## 3. Features
+
+**Deploying**
+- Local deploys of Vite and Create React App projects; automatic package-manager detection (npm, pnpm, yarn).
+- Remote builds in CodeBuild in your own account, with the log streamed to your terminal.
+- Automatic deploys on `git push`, per project, per branch.
+- Override the install or build step (for example `--install-command "npm ci --legacy-peer-deps"`).
+- Build-time environment variables for remote and GitHub builds, stored encrypted in your account, with separate
+  production and preview values.
+
+**Operating**
+- Instant rollback to the previous deployment, or to any recorded one.
+- `list` and `status` for an overview of projects, what is live where, sizes, and the last build; `--json` for scripts.
+- `builds` and `logs` for remote builds, including following a running build and cancelling the watch with Ctrl-C.
+- Retention and cleanup: automatic pruning, a manual `prune` with a dry run, and removal of single projects.
+
+**Safety**
+- Immutable deployments; failed deploys clean up after themselves; safe under concurrent deploys.
+- Scoped IAM roles, a signature-checked webhook, secrets in Secrets Manager, no stored long-lived keys.
+- Confirmation prompts for destructive commands, and `--dry-run` where it matters.
+
+**Infrastructure**
+- One CloudFormation stack created by `init`; safe to rerun; no `cdk bootstrap` needed.
+- Several independent stacks in one account (`--stack-name`), for example staging.
+- `destroy` removes everything, including GitHub webhooks.
+
+---
+
+## 4. Getting started
+
+### 4.1 What you need
+
+- An AWS account, and permission to create the resources listed in [section 8](#8-what-gets-created-in-your-aws-account).
+  During development an IAM user with `AdministratorAccess` was used.
+- **Do not use root access keys.** Create an IAM user (or an SSO profile) and give it a named AWS CLI profile.
+- Node.js 20 or newer, and git.
+- The AWS CLI is not required by the tool, but is handy for checking things.
+
+### 4.2 One-time setup
+
+```sh
+cd /path/to/this/repo
+npm install
+npm run build          # builds core, the engine zip, the CloudFormation template and the single-file CLI
+cd apps/cli && npm link && cd ../..   # installs a real `deployer` command on your PATH
+export AWS_PROFILE=<your-profile>
+deployer --version
+```
+
+`npm link` makes `deployer` available from any directory, and rebuilding with `npm run build` updates it. To remove it,
+run `npm unlink -g @deployer/cli`. Inside the repository you can also run it as `npm run deployer -- <command>`.
+
+**Installing without the repository.** `npm pack` in `apps/cli` produces a ~0.8 MB tarball that installs with
+`npm install -g <tarball>` and has no dependencies: the CLI, the stack template, the Lambda code and the build script
+are all inside it. It has been tested from a clean install. The package is marked `private` for now, because the final
+package name has not been chosen; once it is, removing that flag and running `npm publish` makes
+`npm install -g <name>` work for anyone.
+
+### 4.3 Create the infrastructure
+
+```sh
+deployer init
+```
+
+This takes about 5 minutes the first time (CloudFront is slow to create). It prints the bucket, distribution, default
+URL, build project and webhook URL. It is safe to run again: it only changes what has changed, and prints
+"Already up to date." when nothing has.
+
+The default region is `us-east-1`. Use `--region` to change it.
+
+### 4.4 Your first deploy
+
+```sh
+deployer deploy ./my-react-app --project my-app
+```
+
+When it finishes it prints the live URL (the CloudFront domain). Changes reach every CloudFront location in about
+30 seconds.
+
+---
+
+## 5. Using it day to day
+
+### 5.1 Deploy from your machine
+
+```sh
+deployer deploy ./my-react-app --project my-app
+```
+
+- `--project` defaults to the `name` in `package.json`.
+- `--skip-build` uploads an existing `dist/` or `build/` as it is.
+- `--keep 20` keeps more history than the default 10.
+
+### 5.2 Deploy from AWS instead
+
+```sh
+deployer deploy ./my-react-app --project my-app --remote          # watch the log
+deployer deploy ./my-react-app --project my-app --remote --detach # start it and come back later
+deployer builds -p my-app                                         # recent builds and their status
+deployer logs <build> -f                                          # follow a running build
+```
+
+A remote build spends about 1.5 minutes in CodeBuild startup before your own build begins, so a local deploy is the
+fast choice while iterating. Ctrl-C stops *watching* a build; the build keeps running.
+
+### 5.3 Deploy on every push to GitHub
+
+One time per project:
+
+1. Create a **fine-grained personal access token** at <https://github.com/settings/personal-access-tokens/new>,
+   limited to the repository, with **Contents: Read-only** and **Webhooks: Read and write**.
+2. Run:
+   ```sh
+   deployer github connect -p my-app --repo owner/name
+   ```
+   Paste the token when asked (the input is hidden), or set `GITHUB_TOKEN` in the environment. The token is checked
+   against the repository, stored in your account's Secrets Manager, and the webhook is registered on the repository.
+   The connection (repository, branch, host and any build overrides) is saved on the project.
+
+After that, every push to the connected branch builds and deploys. You can also build the branch's current head
+without pushing:
+
+```sh
+deployer github deploy -p my-app
+```
+
+See [`github`](#github-connect-deploy-disconnect-rotate-secret) in the reference for options, including deploying a
+different branch, a custom host, and several projects from one repository.
+
+### 5.4 Environment variables for remote and GitHub builds
+
+Local deploys read your local `.env` as always. Remote and GitHub builds run in AWS and never receive `.env` files, so
+their build-time variables are stored with `deployer env`, encrypted in your account (AWS Systems Manager Parameter
+Store, SecureString):
+
+```sh
+deployer env set -p my-app VITE_API_URL https://api.example.com
+deployer env set -p my-app API_KEY             # no value given: type it (hidden) or pipe it in
+deployer env import -p my-app .env             # set every variable in a .env file
+deployer env ls -p my-app                      # names and scopes; values are never shown
+deployer env rm -p my-app VITE_API_URL
+```
+
+- A change applies to the **next build**, not to what is live now. Redeploy with `deploy --remote` or `github deploy`.
+- `--preview` stores a value used only by preview builds. A preview build gets the production values with any
+  preview values laid over them, so a preview only needs to list what differs.
+- Names starting `DEPLOY_`, `SOURCE_`, `AWS_` or `CODEBUILD_`, and a few build-system names, are reserved. Values
+  cannot be empty and are limited to 4096 bytes. `import` checks the whole file first and writes nothing if any line is
+  invalid.
+- **These end up in your built JavaScript** if your framework exposes them to the browser (Vite exposes only `VITE_*`,
+  Create React App only `REACT_APP_*`). Use them for public configuration, not secrets. Other variables are visible to
+  the build process only. CodeBuild masks injected values in logs, and the build's metadata lists only the parameter
+  paths.
+
+### 5.5 Roll back
+
+```sh
+deployer list -p my-app               # shows deployment ids and which is live
+deployer rollback -p my-app           # back to the previous deployment
+deployer rollback -p my-app --to d-20261029T104026-4dc09a   # or to a specific one
+```
+
+It takes effect in about 30 seconds. Only recorded deployments can be rolled back to, and only the newest 10 are kept
+by default.
+
+### 5.6 See what you have
+
+```sh
+deployer status        # account, stack, URL, build setup, last build, totals
+deployer list          # every project: where it is live, how old, auto-deploy source, versions, size
+deployer list -p my-app
+```
+
+### 5.7 Clean up
+
+```sh
+deployer prune -p my-app --dry-run    # see what would be deleted
+deployer prune -p my-app
+deployer delete -p my-app             # remove a project completely (asks you to type its name)
+deployer destroy                      # remove the entire stack (asks you to type the stack name)
+```
+
+`delete` removes the project's routes, every deployment folder, its uploaded sources, its environment variables and its GitHub webhook. If the
+project is live, that site starts returning 404 until something else is deployed.
+
+### 5.8 More than one stack
+
+`--stack-name` makes an independent copy in the same account, for example a staging environment:
+
+```sh
+deployer --stack-name Staging init
+deployer --stack-name Staging deploy ./my-react-app
+```
+
+---
+
+## 6. Command reference
+
+Global options, accepted by every command:
+
+| Option | Meaning |
+|---|---|
+| `--profile <name>` | AWS profile to use (or set `AWS_PROFILE`) |
+| `--region <region>` | AWS region (default: `AWS_REGION`, else `us-east-1`) |
+| `--stack-name <name>` | Which stack to operate on (default: `Deployer`) |
+
+### `init`
+Creates or updates the stack, uploads the engine code and build script, and installs them. Safe to rerun.
+If a first attempt failed and rolled back, `init` removes the failed stack and retries.
+
+### `deploy <dir>`
+| Option | Meaning |
+|---|---|
+| `-p, --project <name>` | Project name (default: from `package.json`) |
+| `--host <hostname>` | Host to serve on (default: the CloudFront domain) |
+| `--skip-build` | Upload the existing `dist/` or `build/` as it is (local only) |
+| `--remote` | Build in CodeBuild in your account instead of on this machine |
+| `--detach` | With `--remote`: start the build and return without waiting |
+| `--install-command <cmd>` | Replace the install step |
+| `--build-command <cmd>` | Replace the build step |
+| `--keep <n>` | Deployments to retain per project (live ones are always kept). Default 10 |
+
+### `list` (alias `ls`)
+No options: a table of all projects. `-p, --project <name>` lists one project's deployments. `--json` for scripts.
+
+### `status`
+The account, region, stack state, bucket, CloudFront URL, build setup, webhook URL, number of GitHub-connected
+projects, the last build, and totals. `--json` for scripts.
+
+### `builds`
+| Option | Meaning |
+|---|---|
+| `-p, --project <name>` | Only builds of this project |
+| `--limit <n>` | How many to show (default 10) |
+| `--json` | Machine-readable output |
+
+### `logs <build>`
+Prints a remote build's log. `<build>` is the short id shown by `builds` (or a full id). `-f, --follow` keeps
+streaming until the build finishes. The exit code is 1 if the build did not succeed.
+
+### `rollback`
+| Option | Meaning |
+|---|---|
+| `-p, --project <name>` | Project (required) |
+| `--to <deploymentId>` | Deployment to serve (default: the one before the live one) |
+| `--host <hostname>` | Host to roll back (default: the CloudFront domain) |
+
+### `prune`
+| Option | Meaning |
+|---|---|
+| `-p, --project <name>` | Project (required) |
+| `--keep <n>` | Newest deployments to retain (live ones always kept). Default 10 |
+| `--grace-minutes <n>` | Leave unrecorded uploads newer than this alone. Default 60 |
+| `--dry-run` | Show what would be deleted |
+
+### `delete` (alias `rm`)
+`-p, --project <name>` (required), `-y, --yes` to skip the confirmation, `--dry-run` to preview.
+
+### `destroy`
+Removes GitHub webhooks, empties both buckets and deletes the stack. `-y, --yes` skips the confirmation.
+
+### `env set`, `import`, `ls`, `rm`
+| Command | Options | What it does |
+|---|---|---|
+| `env set <name> [value]` | `-p, --project`, `--preview` | Sets a variable. Also accepts `NAME=value`, or reads the value from stdin or a hidden prompt when none is given |
+| `env import <file>` | `-p, --project`, `--preview` | Sets every variable in a `.env` file (all-or-nothing) |
+| `env ls` | `-p, --project`, `--json` | Lists names and which scopes have a value; values are never shown |
+| `env rm <name>` | `-p, --project`, `--preview` | Removes a variable |
+
+### `github connect`, `deploy`, `disconnect`, `rotate-secret`
+| Command | Options | What it does |
+|---|---|---|
+| `github connect` | `-p, --project`, `--repo <owner/name>`, `--branch`, `--host`, `--install-command`, `--build-command`, `--reuse-token` | Validates the token, stores it, registers the push webhook, saves the connection. `--branch` defaults to the repository's default branch. `--reuse-token` uses the token already stored instead of asking. |
+| `github deploy` | `-p, --project`, `--detach` | Builds the current head of the connected branch now |
+| `github disconnect` | `-p, --project` | Stops deploying from GitHub. The webhook is removed with the last project on a repository |
+| `github rotate-secret` | none | Replaces the webhook's signing secret and creates or updates the webhook on every connected repository |
+
+---
+
+## 7. What your project needs
+
+- A `react` dependency and a `build` script in `package.json`.
+- A **Vite** or **Create React App** project. The build output must be `dist/` or `build/` and contain `index.html`.
+- **Next.js is rejected** with a clear message, before anything is queued or built.
+- Routes that work from the site root, such as React Router's `BrowserRouter`. A Vite `base` or a CRA `homepage`
+  pointing at a sub-path will break asset loading.
+- **Environment variables are baked in at build time.** For a local deploy they come from your local `.env`. Remote
+  and GitHub builds never receive `.env` files; give them their variables with `deployer env` (section 5.4).
+  Never put secrets in variables your framework exposes to the browser: they end up in public JavaScript.
+- Calls to your own backend need CORS to allow your site's URL.
+- Project names use lowercase letters, digits and dashes, start with a letter or digit, and are at most 63 characters.
+
+**Package manager detection** (local and remote): `pnpm-lock.yaml` → `pnpm install --frozen-lockfile`;
+`yarn.lock` → `yarn install --frozen-lockfile`; `package-lock.json` → `npm ci`; otherwise `npm install`. Then
+`<package manager> run build`.
+
+**What a remote deploy uploads.** The source is zipped using `git ls-files` (so nested `.gitignore` files are honoured),
+or, outside a git repository, a directory walk using the root `.gitignore`. These are **never** uploaded:
+`node_modules`, `dist`, `build`, `.git`, `.DS_Store` and `.env*`. The limit is 200 MB.
+
+**Cache headers set on upload**
+
+| Files | `Cache-Control` |
+|---|---|
+| `*.html` | `no-cache` (always revalidated) |
+| anything under `assets/` or `static/` | `public, max-age=31536000, immutable` |
+| everything else | `public, max-age=3600` |
+
+---
+
+## 8. What gets created in your AWS account
+
+`init` creates one CloudFormation stack (default name `Deployer`).
+
+| Resource | Purpose |
+|---|---|
+| S3 bucket "sites" (private) | Deployments, and the per-project history files |
+| S3 bucket "builds" (private) | Uploaded sources (expire after 7 days), engine code, build script |
+| CloudFront distribution, Origin Access Control | Serves the sites over HTTPS; the only reader of the sites bucket |
+| CloudFront KeyValueStore | The routing table |
+| CloudFront Function | The router |
+| CodeBuild project | Runs remote and GitHub builds (Linux, Node 22, 15-minute limit) |
+| Lambda "engine" | Promotes a finished build |
+| Lambda "webhook" + Function URL | Receives GitHub push events |
+| Secrets Manager: webhook secret, GitHub token | Signing secret and the token used to clone |
+| Parameter Store (SecureString), created on demand | Your projects' build-time environment variables, under `/deployer/<stack>/…` |
+| 3 CloudWatch log groups | Kept for 14 days |
+| 3 IAM roles (+ policies) | See below |
+
+**The three IAM roles are scoped to this stack's own resources:**
+
+| Role | Can |
+|---|---|
+| Build | Read and write the sites bucket; read `src/*` and `scripts/*` in the builds bucket; invoke the engine; read the GitHub token secret; read this stack's parameters under `/deployer/<stack>/*`; write its own logs |
+| Engine | Read and write the sites bucket; read, write and delete entries in this KeyValueStore |
+| Webhook | Read `.deployer/*` in the sites bucket; read the webhook secret; start builds on this CodeBuild project |
+
+**Cost.** A small personal setup costs little. CloudFront, Lambda and CodeBuild all have free tiers (CodeBuild's is
+100 build-minutes a month on the small instance size), S3 storage for a few sites is pennies, and the main fixed cost
+is roughly 40 cents a month for each of the two secrets. Check current AWS pricing for your usage. The CLI's retention
+settings keep S3 storage bounded.
+
+---
+
+## 9. Security model
+
+- **No long-lived credentials are stored by the tool.** The CLI uses your AWS profile. Everything running inside AWS
+  uses role-based access.
+- **The webhook URL is public by design.** The protection is GitHub's HMAC-SHA256 signature, checked with a
+  constant-time comparison against a secret generated in your account. A request without a valid signature gets a 401
+  and starts nothing. Only `push` events are acted on; `ping` is answered.
+- **The webhook secret is never printed by the CLI.** If webhook registration is not possible, the CLI prints the
+  command that reads it. If it is ever exposed, `github rotate-secret` replaces it.
+- **The GitHub token** is kept in Secrets Manager, passed to git in an HTTP header (never in a URL, so it cannot
+  appear in error output). Build logs were scanned for the token (the stack's placeholder value, in tests) and it
+  never appeared, but treat logs as sensitive anyway. Use a fine-grained token limited to
+  one repository, with a short expiry for testing, and revoke it when you no longer need it.
+- **Buckets are private.** Visitors only reach site files through CloudFront.
+- **Build code is arbitrary code.** CodeBuild runs a project's own install and build scripts in your account, with the
+  build role's permissions. Only build code you trust.
+- **Dev credentials.** During development an admin IAM user was used. Before any wider release, replace that with a
+  least-privilege policy for whoever runs the CLI. Any access key that has been pasted into a chat, ticket or log
+  should be deactivated and replaced.
+
+---
+
+## 10. Limits and known issues
+
+- **One site per URL for now.** All projects share the CloudFront URL, so the last project deployed there wins.
+  `--host` only helps once custom domains exist (a host must actually reach the distribution).
+- **No custom domains or preview URLs yet.**
+- **Static React only.** No Next.js or server rendering.
+- **Remote builds are slow to start** (about 1.5 minutes before your build begins).
+- **Missing files return a 403** XML page from S3 instead of a 404.
+- **A GitHub token is always required** to connect a repository, even a public one: it registers the webhook and is
+  sent when cloning. One token serves a whole stack.
+- **Rollback reaches back 10 deployments by default** (`--keep` changes that).
+- **Routing changes take about 30 seconds** to reach every edge location, not zero.
+- **No automated test suite.** The system was verified by running every feature against a real AWS account, including
+  failure cases and a full create and destroy of a throwaway stack. Adding automated tests is future work.
+- Not yet exercised: serving several projects on separate hosts, and registering the webhook on a repository owned by
+  a GitHub organization (which may need an owner to approve the token).
+
+---
+
+## 11. Troubleshooting
+
+| You see | Cause and fix |
+|---|---|
+| `npm ci` fails with `ERESOLVE` (a peer-dependency conflict) | Fix the versions in the project, or deploy with a looser install: `--install-command "npm ci --legacy-peer-deps"`. The CLI repeats this hint when it sees the error. |
+| The CLI hangs on AWS calls, especially routing-table writes | Your network advertises IPv6 but drops it. The CLI already prefers IPv4. If you run your own scripts against the AWS SDK, start Node with `NODE_OPTIONS="--dns-result-order=ipv4first --no-network-family-autoselection"`. |
+| `GitHub said 403: Resource not accessible by personal access token` | The token lacks the **Webhooks: Read and write** permission. Edit the token's permissions on GitHub (the token itself does not change), then run `deployer github rotate-secret`, which registers the webhook. |
+| `GitHub rejected the token` | Expired, revoked or mistyped. Run `github connect` again with a valid token. |
+| `Repository … was not found, or the token cannot see it` | The token was not given access to that repository. |
+| `Could not fetch <repo> at <sha>` in a build log | The repository does not exist or the stored token cannot read it. Store a new token with `github connect`. |
+| `Build output not found: expected dist/index.html or build/index.html` | The build ran but produced no site. Check the project's build script and output folder. |
+| `Next.js is not supported yet` | Only static React projects work for now. |
+| `deployer: command not found` | The link is gone or your PATH does not include npm's global bin folder (`npm prefix -g`). Run `npm link` again in `apps/cli`. |
+| `Stack "Deployer" not found. Run deployer init first.` | The stack does not exist in this account and region, or you are using a different `--profile`, `--region` or `--stack-name`. |
+| Visitors get a plain-text "No deployment is live for …" | The hostname has no route. Deploy to it, or roll back to a recorded deployment. |
+| A site still shows the old version | Routing changes take about 30 seconds to reach every location. |
+| `init` fails, or the stack shows `ROLLBACK_COMPLETE` | Rerun `init`: it removes the failed stack and tries again, and prints the resource that actually failed. |
+| `Unknown option` after pasting `--stack-name` from a shell variable in zsh | zsh does not split unquoted variables into words. Write the option out in full. |
+
+---
+
+## 12. The repository, and working on it
+
+```
+apps/cli/            the `deployer` command-line tool
+  src/commands/      one file per command (deploy, remote-deploy, list, github, …)
+  src/lib/           helpers: AWS access, building, zipping, GitHub API, log streaming, formatting
+packages/core/       code shared by the CLI and the Lambdas: routing table, history, pruning, object helpers
+packages/engine/     the two Lambda functions (promote, webhook) and the script that bundles them into a zip
+packages/stack/      the infrastructure definition (AWS CDK), the router function, and the CodeBuild script
+docs/                this guide
+examples/sample/     a small React app used for testing
+```
+
+The code is TypeScript in npm workspaces. `npm run build` runs, in order: `core` → `engine` (bundles the Lambdas into
+`apps/cli/assets/engine.zip`) → `stack` (writes `apps/cli/assets/template.json` and copies the build script) → `cli`
+(type-checks, then bundles everything into the single file `apps/cli/dist/deployer.mjs`).
+The CLI ships the template, engine zip and build script as assets, and `init` uploads them. That is why the stack
+needs no `cdk bootstrap`. The published package has no runtime dependencies: AWS request signing for the routing
+table uses a pure-JavaScript implementation, so nothing native is installed or shipped to Lambda.
+
+**Conventions worth knowing**
+
+- Anything the CLI and a Lambda both do (set a route, update history, prune) lives in `packages/core`, so a local
+  deploy and a cloud deploy cannot drift apart.
+- Both the history file and the routing table use optimistic locking. Use `updateManifest` and `setRoute`; do not
+  write them directly.
+- Names CDK would derive from the construct path are made stack-specific (except for a stack called `Deployer`, which
+  keeps its original names so existing installs are not replaced). Check any new fixed physical name the same way.
+- Before changing the stack, preview the effect on a live stack with a CloudFormation change set and look for any
+  replacement.
+- Test new features against a real stack, and test a from-scratch `init` on a throwaway stack name, because upgrading
+  an existing stack hides problems that a fresh install hits.
+
+---
+
+## 13. Status and roadmap
+
+**Done and verified against a real AWS account**
+
+| Area | State |
+|---|---|
+| Infrastructure from scratch, upgrade, and removal (`init`, `destroy`) | done |
+| Local deploys, rollback, pruning, project deletion | done |
+| Remote builds in CodeBuild, `builds`, `logs` | done |
+| GitHub push deploys, secret rotation | done, including a real push from a real repository |
+| Concurrency safety (history file and routing table) | done |
+| Build-time environment variables (production and preview scopes) | done |
+
+**Next (planned):**
+
+1. **Custom domains**, which also lets several projects share one account side by side.
+2. **Pull-request preview URLs.**
+3. **A least-privilege policy** for the person running the CLI, before any public release.
+4. **A web dashboard** that connects to your AWS account (a cross-account role, with no raw keys), and can also be
+   self-hosted.
+5. **Other static frameworks** (Vue, Svelte, Astro static), then **server-rendered frameworks** such as Next.js.
+
+License: Apache-2.0.

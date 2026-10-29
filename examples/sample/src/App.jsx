@@ -17,6 +17,7 @@ function App() {
         </div>
         <div>
           <h1>VERSION TWO</h1>
+          <p id="greeting">Greeting: {import.meta.env.VITE_GREETING ?? 'no greeting set'}</p>
           <p>
             Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
           </p>

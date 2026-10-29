@@ -1,5 +1,6 @@
 export * from './build.js';
 export * from './cleanup.js';
+export * from './env.js';
 export * from './clients.js';
 export * from './ids.js';
 export * from './kvs.js';

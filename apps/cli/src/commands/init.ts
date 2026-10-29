@@ -23,7 +23,15 @@ import {
   whoAmI,
 } from '../lib/aws.js';
 
-const asset = (name: string) => fileURLToPath(new URL(`../../assets/${name}`, import.meta.url));
+// The package keeps its assets in <package>/assets. This file runs from dist/commands/ (tsc build) or
+// dist/ (the single-file bundle), so look in both places.
+const asset = (name: string): string => {
+  for (const rel of [`../assets/${name}`, `../../assets/${name}`]) {
+    const file = fileURLToPath(new URL(rel, import.meta.url));
+    if (fs.existsSync(file)) return file;
+  }
+  return fileURLToPath(new URL(`../assets/${name}`, import.meta.url));
+};
 const MAX_WAIT_SECONDS = 1800;
 const BUILD_SCRIPT_KEY = 'scripts/build.sh';
 

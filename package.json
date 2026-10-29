@@ -12,6 +12,6 @@
   },
   "scripts": {
     "build": "npm run build -w packages/core && npm run build -w packages/engine && npm run build -w packages/stack && npm run build -w apps/cli",
-    "deployer": "node apps/cli/dist/index.js"
+    "deployer": "node apps/cli/dist/deployer.mjs"
   }
 }

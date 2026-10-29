@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { DEFAULT_KEEP, newDeploymentId, s3, startBuild } from '@deployer/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
+import { projectBuildEnv } from '../lib/build-env.js';
 import { detectFramework } from '../lib/build.js';
 import { formatBytes } from '../lib/format.js';
 import { parseKeep, resolveProject } from '../lib/project.js';
@@ -23,10 +24,12 @@ export async function remoteDeploy(dirArg: string, opts: DeployOptions, global: 
   }
   const host = (opts.host ?? out.domain).toLowerCase();
 
+  const env = await projectBuildEnv(out.bucket, global.stackName, project);
   const { zip, files, skippedEnvFiles } = zipSource(dir);
   if (skippedEnvFiles.length > 0) {
     console.log(
-      `Not uploading ${skippedEnvFiles.join(', ')}. Build-time environment variables are not supported in remote builds yet.`,
+      `Not uploading ${skippedEnvFiles.join(', ')}. Remote builds use the variables stored with \`deployer env\` ` +
+        `(${env.length} set for this project); import a file with: deployer env import -p ${project} <file>`,
     );
   }
 
@@ -43,6 +46,7 @@ export async function remoteDeploy(dirArg: string, opts: DeployOptions, global: 
     source: { type: 's3', key },
     installCommand: opts.installCommand,
     buildCommand: opts.buildCommand,
+    env,
   });
   await watchBuild(buildId, host, project, Boolean(opts.detach));
 }

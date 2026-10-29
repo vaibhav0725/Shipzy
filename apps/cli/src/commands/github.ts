@@ -9,6 +9,7 @@ import {
   updateManifest,
 } from '@deployer/core';
 import { getOutputs, GlobalOptions, StackOutputs } from '../lib/aws.js';
+import { projectBuildEnv } from '../lib/build-env.js';
 import {
   explainGithubError,
   getRepo,
@@ -133,6 +134,7 @@ export async function githubDeploy(opts: { project: string; detach?: boolean }, 
     source: { type: 'github', repo: source.repo, sha },
     installCommand: source.installCommand,
     buildCommand: source.buildCommand,
+    env: await projectBuildEnv(out.bucket, global.stackName, opts.project),
   });
   await watchBuild(buildId, source.host ?? out.domain, opts.project, Boolean(opts.detach));
 }

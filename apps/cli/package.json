@@ -4,33 +4,39 @@
   "license": "Apache-2.0",
   "type": "module",
   "bin": {
-    "deployer": "dist/index.js"
+    "deployer": "dist/deployer.mjs"
   },
   "files": [
-    "dist",
+    "dist/deployer.mjs",
     "assets"
   ],
   "scripts": {
-    "build": "tsc -p ."
+    "typecheck": "tsc -p . --noEmit",
+    "build": "tsc -p . --noEmit && node scripts/bundle.mjs"
   },
-  "dependencies": {
+  "devDependencies": {
     "@aws-sdk/client-cloudformation": "^3.1159.0",
     "@aws-sdk/client-cloudfront": "^3.1159.0",
     "@aws-sdk/client-cloudwatch-logs": "^3.1159.0",
     "@aws-sdk/client-codebuild": "^3.1159.0",
     "@aws-sdk/client-s3": "^3.1159.0",
     "@aws-sdk/client-secrets-manager": "^3.1159.0",
+    "@aws-sdk/client-ssm": "^3.1159.0",
     "@aws-sdk/client-sts": "^3.1159.0",
     "@aws-sdk/credential-providers": "^3.1159.0",
     "@deployer/core": "*",
-    "commander": "^15.0.0",
-    "fflate": "^0.8.2",
-    "ignore": "^7.0.0",
-    "mime-types": "^3.0.2"
-  },
-  "devDependencies": {
     "@types/mime-types": "^3.0.1",
     "@types/node": "^26.6.6",
+    "commander": "^15.0.0",
+    "esbuild": "^0.28.0",
+    "fflate": "^0.8.2",
+    "ignore": "^7.0.0",
+    "mime-types": "^3.0.2",
     "typescript": "^7.0.2"
+  },
+  "private": true,
+  "description": "Deploy static React apps to your own AWS account (S3 + CloudFront)",
+  "engines": {
+    "node": ">=20"
   }
 }

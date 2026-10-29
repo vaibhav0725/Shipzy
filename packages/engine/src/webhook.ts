@@ -1,6 +1,13 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { GetSecretValueCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
-import { DEFAULT_KEEP, listManifestProjects, newDeploymentId, readManifest, startBuild } from '@deployer/core';
+import {
+  buildEnvVars,
+  DEFAULT_KEEP,
+  listManifestProjects,
+  newDeploymentId,
+  readManifest,
+  startBuild,
+} from '@deployer/core';
 import { env } from './env.js';
 
 interface FunctionUrlEvent {
@@ -69,7 +76,7 @@ export async function webhook(event: FunctionUrlEvent) {
   const bucket = env('SITES_BUCKET');
   const started: { project: string; buildId: string }[] = [];
   for (const project of await listManifestProjects(bucket)) {
-    const { source } = await readManifest(bucket, project);
+    const { source, env: projectEnv } = await readManifest(bucket, project);
     if (source?.type !== 'github' || source.repo.toLowerCase() !== repo || source.branch !== branch) continue;
     const buildId = await startBuild(env('BUILD_PROJECT'), {
       project,
@@ -79,6 +86,7 @@ export async function webhook(event: FunctionUrlEvent) {
       source: { type: 'github', repo: payload.repository!.full_name!, sha: payload.after },
       installCommand: source.installCommand,
       buildCommand: source.buildCommand,
+      env: buildEnvVars(env('STACK_NAME'), project, projectEnv, 'production'),
     });
     started.push({ project, buildId });
   }

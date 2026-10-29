@@ -6,6 +6,7 @@ import { configureEnv, errorMessage, GlobalOptions } from './lib/aws.js';
 import { builds } from './commands/builds.js';
 import { deploy } from './commands/deploy.js';
 import { deleteProject } from './commands/delete.js';
+import { envImport, envList, envRemove, envSet } from './commands/env.js';
 import { destroy } from './commands/destroy.js';
 import { connect, disconnect, githubDeploy, rotateSecret } from './commands/github.js';
 import { init } from './commands/init.js';
@@ -22,8 +23,12 @@ import { DEFAULT_GRACE_MINUTES, DEFAULT_KEEP } from '@deployer/core';
 dns.setDefaultResultOrder('ipv4first');
 net.setDefaultAutoSelectFamily(false);
 
+// Injected by the bundler; plain `tsc` builds (and tests) have no value for it.
+declare const __DEPLOYER_VERSION__: string | undefined;
+
 const program = new Command()
   .name('deployer')
+  .version(typeof __DEPLOYER_VERSION__ === 'undefined' ? 'dev' : __DEPLOYER_VERSION__)
   .description('Deploy static React apps to your own AWS account (S3 + CloudFront)')
   .option('--profile <name>', 'AWS profile to use')
   .option('--region <region>', 'AWS region (default: AWS_REGION or us-east-1)')
@@ -78,6 +83,37 @@ program
   .description('Show the log of a remote build (id as shown by `deployer builds`)')
   .option('-f, --follow', 'keep streaming until the build finishes')
   .action((build, opts) => logs(build, opts, globals()));
+
+const env = program.command('env').description('Build-time environment variables for remote and GitHub builds');
+
+env
+  .command('set <name> [value]')
+  .description('Set a variable (NAME VALUE, NAME=VALUE, or just NAME to type or pipe the value)')
+  .requiredOption('-p, --project <name>')
+  .option('--preview', 'a value used only by preview builds (overrides the production value there)')
+  .action((name, value, opts) => envSet(name, value, opts, globals()));
+
+env
+  .command('import <file>')
+  .description('Set every variable in a .env file')
+  .requiredOption('-p, --project <name>')
+  .option('--preview', 'import as preview-only overrides')
+  .action((file, opts) => envImport(file, opts, globals()));
+
+env
+  .command('ls')
+  .alias('list')
+  .description("List a project's variable names (values are never shown)")
+  .requiredOption('-p, --project <name>')
+  .option('--json', 'machine-readable output')
+  .action((opts) => envList(opts, globals()));
+
+env
+  .command('rm <name>')
+  .description('Remove a variable')
+  .requiredOption('-p, --project <name>')
+  .option('--preview', 'remove the preview override')
+  .action((name, opts) => envRemove(name, opts, globals()));
 
 const github = program.command('github').description('Deploy a project automatically when its GitHub repository is pushed to');
 
@@ -143,8 +179,8 @@ program
   .option('-y, --yes', 'skip the confirmation prompt')
   .action((opts) => destroy(opts, globals()));
 
-// The CRT module (needed for KeyValueStore SigV4a) keeps the event loop alive,
-// so exit explicitly once the command has finished.
+// Exit explicitly so keep-alive sockets cannot hold the process open, and so a failure exit code set by a
+// command (process.exitCode) is what the shell sees.
 program
   .parseAsync()
   .then(() => process.exit(process.exitCode ?? 0))

@@ -206,6 +206,13 @@ export class DeployerStack extends cdk.Stack {
     bucket.grantReadWrite(project);
     builds.grantRead(project, 'src/*');
     builds.grantRead(project, 'scripts/*');
+    // Project environment variables are injected by CodeBuild from SSM Parameter Store (see `deployer env`).
+    project.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['ssm:GetParameters'],
+        resources: [cdk.Stack.of(this).formatArn({ service: 'ssm', resource: 'parameter', resourceName: 'deployer/' + cdk.Aws.STACK_NAME + '/*' })],
+      }),
+    );
     engine.grantInvoke(project);
     githubToken.grantRead(project);
 
@@ -214,6 +221,7 @@ export class DeployerStack extends cdk.Stack {
       SITES_BUCKET: bucket.bucketName,
       BUILD_PROJECT: project.projectName,
       WEBHOOK_SECRET_ARN: webhookSecret.secretArn,
+      STACK_NAME: cdk.Aws.STACK_NAME,
     });
     bucket.grantRead(webhook, '.deployer/*');
     webhookSecret.grantRead(webhook);

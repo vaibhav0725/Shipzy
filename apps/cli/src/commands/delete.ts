@@ -3,6 +3,7 @@ import {
   deleteManifest,
   deletePrefix,
   deleteRoute,
+  envParamPrefix,
   listDeploymentIds,
   listGithubConnections,
   listManifestProjects,
@@ -11,6 +12,7 @@ import {
 } from '@deployer/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { confirmByTyping } from '../lib/prompt.js';
+import { deleteParamsUnder } from '../lib/ssm.js';
 import { removeRepoWebhook } from '../lib/webhooks.js';
 
 export interface DeleteOptions {
@@ -40,6 +42,8 @@ export async function deleteProject(opts: DeleteOptions, global: GlobalOptions):
   console.log(`Project "${project}": ${folders.length} deployment folder${folders.length === 1 ? '' : 's'} in S3.`);
   for (const r of routes) console.log(`  live on ${r.host}: this site will start returning 404`);
   if (routes.length === 0) console.log('  not live anywhere, so no site is affected');
+  const envCount = (manifest.env?.production.length ?? 0) + (manifest.env?.preview.length ?? 0);
+  if (envCount > 0) console.log(`  ${envCount} environment variable${envCount === 1 ? '' : 's'} will be deleted`);
   if (manifest.source) console.log(`  deploys from ${manifest.source.repo}@${manifest.source.branch}: its GitHub connection will be removed`);
 
   if (opts.dryRun) {
@@ -55,6 +59,7 @@ export async function deleteProject(opts: DeleteOptions, global: GlobalOptions):
   for (const r of routes) await deleteRoute(out.kvsArn, r.host);
   const objects = await deletePrefix(out.bucket, `${project}/`);
   if (out.buildsBucket) await deletePrefix(out.buildsBucket, `src/${project}/`);
+  await deleteParamsUnder(envParamPrefix(global.stackName, project));
 
   // The history file holds the GitHub connection, so deal with the webhook before it goes.
   if (manifest.source) {

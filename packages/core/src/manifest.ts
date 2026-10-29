@@ -5,6 +5,7 @@ import {
   PutObjectCommand,
 } from '@aws-sdk/client-s3';
 import { s3 } from './clients.js';
+import type { ManifestEnv } from './env.js';
 
 export interface Deployment {
   id: string;
@@ -31,6 +32,8 @@ export interface Manifest {
   live: Record<string, string>;
   /** where pushes come from, when the project is connected to GitHub */
   source?: GithubSource;
+  /** names of the project's build-time environment variables (values are in SSM) */
+  env?: ManifestEnv;
 }
 
 export const MANIFEST_PREFIX = '.deployer/';

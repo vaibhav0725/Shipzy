@@ -1,5 +1,6 @@
-// SigV4a signing, required by the KeyValueStore data plane.
-import '@aws-sdk/signature-v4-crt';
+// SigV4a signing, required by the KeyValueStore data plane. The pure-JavaScript implementation is used so
+// nothing native has to be installed or shipped to Lambda.
+import '@aws-sdk/signature-v4a';
 import {
   CloudFrontKeyValueStoreClient,
   DeleteKeyCommand,

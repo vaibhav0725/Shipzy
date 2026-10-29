@@ -1,36 +1,45 @@
 # deployer (working name)
 
+> **Full documentation:** [docs/GUIDE.md](docs/GUIDE.md) covers how it works, every feature, how to use it, and troubleshooting.
+
 Open-source, bring-your-own-AWS deployer for static React apps. Everything runs in **your** AWS
 account: an S3 bucket, a CloudFront distribution, and a CloudFront KeyValueStore that maps hosts to
 immutable deployments, so promote and rollback are a single routing update (visible at the edge in about 30 seconds, with no re-upload or distribution update).
 
 ## Status
-Phase 1: stack + CLI. No dashboard, GitHub integration or custom domains yet.
+Phases 1 and 2 are done (local and remote builds, rollback, GitHub push deploys) along with build-time
+environment variables. No dashboard, custom domains or preview URLs yet.
 
 ## Setup
 ```sh
 npm install
-npm run build          # synthesizes the CloudFormation template and compiles the CLI
-export AWS_PROFILE=deployer-dev   # use an IAM user or SSO profile, not root
+npm run build          # builds the shared code, the Lambda zip, the stack template and the single-file CLI
+cd apps/cli && npm link && cd ../..   # puts a real `deployer` command on your PATH
+export AWS_PROFILE=deployer-dev       # use an IAM user or SSO profile, not root
+deployer --version
 ```
+
+`npm unlink -g @deployer/cli` removes it again. Inside the repo you can also run `npm run deployer -- <command>`.
 
 ## Usage
 ```sh
-npm run deployer -- init                                   # create the stack (~5 min)
-npm run deployer -- deploy ./my-react-app --project demo   # build, upload, promote
-npm run deployer -- deploy ./my-react-app --remote         # build in CodeBuild in your AWS account instead
-npm run deployer -- builds                                 # recent remote builds
-npm run deployer -- logs <build> -f                        # a build's log (id from `builds`)
-npm run deployer -- github connect -p demo --repo owner/name   # deploy on every push (asks for a GitHub token)
-npm run deployer -- github deploy -p demo                  # build the connected branch's current head now
-npm run deployer -- github disconnect -p demo
-npm run deployer -- status                                 # account, stack, URL, totals
-npm run deployer -- list                                   # all projects: live host, version, size
-npm run deployer -- list --project demo                    # one project's deployments
-npm run deployer -- rollback --project demo                # back to the previous deployment
-npm run deployer -- prune --project demo --dry-run           # preview cleanup
-npm run deployer -- delete --project demo                  # remove one project: sites, sources, webhook (asks to confirm)
-npm run deployer -- destroy                                # remove the whole stack: sites, webhooks, both buckets
+deployer init                                   # create the stack (~5 min)
+deployer deploy ./my-react-app --project demo   # build, upload, promote
+deployer deploy ./my-react-app --remote         # build in CodeBuild in your AWS account instead
+deployer builds                                 # recent remote builds
+deployer logs <build> -f                        # a build's log (id from `builds`)
+deployer env set -p demo VITE_API_URL https://api.example.com   # build-time variable for remote/GitHub builds
+deployer env ls -p demo                                    # names only; values are never shown
+deployer github connect -p demo --repo owner/name   # deploy on every push (asks for a GitHub token)
+deployer github deploy -p demo                  # build the connected branch's current head now
+deployer github disconnect -p demo
+deployer status                                 # account, stack, URL, totals
+deployer list                                   # all projects: live host, version, size
+deployer list --project demo                    # one project's deployments
+deployer rollback --project demo                # back to the previous deployment
+deployer prune --project demo --dry-run           # preview cleanup
+deployer delete --project demo                  # remove one project: sites, sources, webhook (asks to confirm)
+deployer destroy                                # remove the whole stack: sites, webhooks, both buckets
 ```
 
 `list` and `status` accept `--json` for scripting.

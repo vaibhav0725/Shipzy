@@ -1,4 +1,5 @@
 import { CodeBuildClient, StartBuildCommand } from '@aws-sdk/client-codebuild';
+import type { BuildEnvVar } from './env.js';
 
 export type BuildSource = { type: 's3'; key: string } | { type: 'github'; repo: string; sha: string };
 
@@ -10,13 +11,21 @@ export interface BuildRequest {
   source: BuildSource;
   installCommand?: string;
   buildCommand?: string;
+  /** the project's own build-time variables, injected from SSM Parameter Store */
+  env?: BuildEnvVar[];
+}
+
+export interface BuildEnvironmentVariable {
+  name: string;
+  value: string;
+  type: 'PLAINTEXT' | 'PARAMETER_STORE';
 }
 
 /**
  * The contract between whoever starts a build (CLI, webhook) and the buildspec in the stack:
  * everything a build needs arrives as environment variables.
  */
-export function buildEnvironment(req: BuildRequest): { name: string; value: string; type: 'PLAINTEXT' }[] {
+export function buildEnvironment(req: BuildRequest): BuildEnvironmentVariable[] {
   const vars: [string, string | undefined][] = [
     ['DEPLOY_PROJECT', req.project],
     ['DEPLOY_ID', req.id],
@@ -29,9 +38,14 @@ export function buildEnvironment(req: BuildRequest): { name: string; value: stri
     ['INSTALL_COMMAND', req.installCommand],
     ['BUILD_COMMAND', req.buildCommand],
   ];
-  return vars
+  const plain = vars
     .filter((v): v is [string, string] => !!v[1])
-    .map(([name, value]) => ({ name, value, type: 'PLAINTEXT' as const }));
+    .map(([name, value]): BuildEnvironmentVariable => ({ name, value, type: 'PLAINTEXT' }));
+  // CodeBuild resolves PARAMETER_STORE values itself, so the secret never appears in the build's metadata.
+  const fromSsm = (req.env ?? []).map(
+    ({ name, path }): BuildEnvironmentVariable => ({ name, value: path, type: 'PARAMETER_STORE' }),
+  );
+  return [...plain, ...fromSsm];
 }
 
 /** Starts a build and returns its id. */
