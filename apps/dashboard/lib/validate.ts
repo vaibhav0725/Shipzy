@@ -50,6 +50,22 @@ export const host = (v: unknown): string => {
   return s;
 };
 
+/** A preview domain: a wildcard such as `*.preview.example.com`. */
+export const previewDomain = (v: unknown): string => {
+  const s = str(v, 'The preview domain').toLowerCase();
+  if (!s.startsWith('*.')) throw new InputError('A preview domain is a wildcard, like *.preview.example.com.');
+  return `*.${host(s.slice(2))}`;
+};
+
+/** Either a plain hostname or a preview domain (for checking and removing domains). */
+export const anyHost = (v: unknown): string => (typeof v === 'string' && v.trim().startsWith('*.') ? previewDomain(v) : host(v));
+
+export const pullRequest = (v: unknown): string => {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 1 || n > 10_000_000) throw new InputError('Enter a pull request number.');
+  return String(n);
+};
+
 // Mirrors packages/core/src/env.ts (the CLI enforces it too; this only gives an answer before a process starts).
 const RESERVED_PREFIXES = ['DEPLOY_', 'SOURCE_', 'AWS_', 'CODEBUILD_'];
 const RESERVED_NAMES = new Set([

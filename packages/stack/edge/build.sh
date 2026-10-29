@@ -3,11 +3,33 @@
 #   per build:           DEPLOY_PROJECT DEPLOY_ID [DEPLOY_HOSTS] [DEPLOY_KEEP]   (hosts: comma-separated; default is decided by the engine)
 #                        SOURCE_TYPE (s3|github) SOURCE_S3_KEY | SOURCE_REPO SOURCE_REF
 #                        [INSTALL_COMMAND] [BUILD_COMMAND]
+#                        [DEPLOY_PREVIEW_PR]   (set when this is a preview of a pull request)
 set -euo pipefail
 
 : "${DEPLOY_PROJECT:?}" "${DEPLOY_ID:?}" "${SOURCE_TYPE:?}"
 SRC=/tmp/source
 mkdir -p "$SRC"
+
+UPLOADED=0
+INVOKED=0
+DEST="s3://$SITES_BUCKET/$DEPLOY_PROJECT/$DEPLOY_ID"
+# Until the engine has been asked to promote, a failed build owns its partial upload and removes it.
+# After that the engine owns cleanup (it must not delete a folder a route may already point at).
+# A failed preview also tells the engine, which says so on the pull request.
+on_exit() {
+  local code=$?
+  if [ "$UPLOADED" = 1 ] && [ "$INVOKED" = 0 ]; then
+    echo "==> Removing partial upload"
+    aws s3 rm "$DEST/" --recursive --only-show-errors || true
+  fi
+  if [ "$code" != 0 ] && [ -n "${DEPLOY_PREVIEW_PR:-}" ]; then
+    jq -nc --arg project "$DEPLOY_PROJECT" --arg pr "$DEPLOY_PREVIEW_PR" --arg sha "${SOURCE_REF:-}" \
+      '{action:"preview-failed",project:$project,pr:($pr|tonumber),sha:$sha}' > /tmp/failed.json || true
+    aws lambda invoke --function-name "$ENGINE_FUNCTION" --cli-binary-format raw-in-base64-out \
+      --payload file:///tmp/failed.json /tmp/failed-out.json > /dev/null 2>&1 || true
+  fi
+}
+trap on_exit EXIT
 
 echo "==> Fetching source ($SOURCE_TYPE)"
 case "$SOURCE_TYPE" in
@@ -66,19 +88,6 @@ for d in dist build; do
 done
 [ -n "$OUT" ] || { echo "Build output not found: expected dist/index.html or build/index.html."; exit 1; }
 
-DEST="s3://$SITES_BUCKET/$DEPLOY_PROJECT/$DEPLOY_ID"
-UPLOADED=0
-INVOKED=0
-# Until the engine has been asked to promote, a failed build owns its partial upload and removes it.
-# After that the engine owns cleanup (it must not delete a folder a route may already point at).
-cleanup() {
-  if [ "$UPLOADED" = 1 ] && [ "$INVOKED" = 0 ]; then
-    echo "==> Removing partial upload"
-    aws s3 rm "$DEST/" --recursive --only-show-errors || true
-  fi
-}
-trap cleanup EXIT
-
 echo "==> Uploading $OUT to $DEST"
 UPLOADED=1
 # Same cache rules as the CLI: html always revalidates, hashed bundler output is immutable.
@@ -95,8 +104,9 @@ FILES="$(find "$OUT" -type f | wc -l | tr -d ' ')"
 
 echo "==> Promoting $DEPLOY_PROJECT/$DEPLOY_ID"
 PAYLOAD="$(jq -nc --arg project "$DEPLOY_PROJECT" --arg id "$DEPLOY_ID" --arg hosts "${DEPLOY_HOSTS:-}" \
-  --argjson keep "${DEPLOY_KEEP:-10}" --argjson files "$FILES" \
-  '{action:"promote",project:$project,id:$id,hosts:(if $hosts == "" then null else ($hosts | split(",")) end),keep:$keep,files:$files}')"
+  --argjson keep "${DEPLOY_KEEP:-10}" --argjson files "$FILES" --arg pr "${DEPLOY_PREVIEW_PR:-}" --arg sha "${SOURCE_REF:-}" \
+  '{action:"promote",project:$project,id:$id,hosts:(if $hosts == "" then null else ($hosts | split(",")) end),keep:$keep,files:$files}
+   + (if $pr == "" then {} else {preview:{pr:($pr|tonumber),sha:$sha}} end)')"
 INVOKED=1
 aws lambda invoke --function-name "$ENGINE_FUNCTION" --cli-read-timeout 300 --cli-binary-format raw-in-base64-out \
   --payload "$PAYLOAD" /tmp/promote.json > /tmp/invoke.json
@@ -104,5 +114,9 @@ cat /tmp/promote.json; echo
 if jq -e 'has("FunctionError")' /tmp/invoke.json > /dev/null; then
   echo "Promote failed."
   exit 1
+fi
+if jq -e 'has("skipped")' /tmp/promote.json > /dev/null; then
+  echo "==> Not published: $(jq -r '.skipped' /tmp/promote.json)"
+  exit 0
 fi
 echo "==> Live: $(jq -r '.urls | join(", ")' /tmp/promote.json)"

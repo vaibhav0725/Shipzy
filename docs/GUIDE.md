@@ -33,7 +33,7 @@ the CLI on your machine.
 - A deploy produces an immutable copy of your site. Going live, and going back, is a single small update.
 - You can build on your own machine (fast) or inside your AWS account (reproducible, and needed for GitHub).
 
-**It is not (yet)**: a hosted service, a dashboard you can open from anywhere (there is a local one, section 5.10), or a Next.js host. Pull-request preview URLs are not built yet. See
+**It is not (yet)**: a hosted service, a dashboard you can open from anywhere (there is a local one, section 5.10), or a Next.js host. See
 [section 13](#13-status-and-roadmap).
 
 ---
@@ -273,6 +273,40 @@ deployer github deploy -p my-app
 See [`github`](#github-connect-deploy-disconnect-rotate-secret) in the reference for options, including deploying a
 different branch, a custom host, and several projects from one repository.
 
+#### Pull request previews
+
+Each open pull request can get its own address, such as `my-app-pr-12.preview.example.com`, rebuilt on every push
+and removed when the pull request closes. A comment with the link is kept up to date on the pull request.
+
+One time per stack, add a **wildcard preview domain** (it serves the previews of every project; it has its own
+certificate and distribution, like a custom domain, and the same Route 53 / manual DNS rules apply):
+
+```sh
+deployer domain add "*.preview.example.com" --preview
+```
+
+One time per project, connect it to GitHub with previews on (and give the token **Pull requests: Read and write**,
+so the comment can be posted):
+
+```sh
+deployer github connect -p my-app --repo owner/name --previews --reuse-token
+```
+
+Then open a pull request into the connected branch. See what exists with `deployer previews`, or remove one by hand
+with `deployer previews rm -p my-app 12`.
+
+How it behaves:
+
+- Only pull requests from a branch **of the same repository** are built. A fork's code is never run, because a build
+  receives the project's variables.
+- A preview build gets the project's production variables with any `--preview` values laid over them (section 5.4).
+- Before a preview goes live the engine asks GitHub whether the pull request is still open and still at that commit,
+  so a late or superseded build never goes live and a closed pull request is never revived.
+- A failed preview build comments on the pull request; the previous preview, if any, keeps being served.
+- Previews never count towards the newest-10 retention of production deployments, and are never touched by
+  `rollback`. Only the newest build of each pull request is kept.
+- Removing the preview domain (`deployer domain rm "*.preview.example.com"`) removes every preview on it.
+
 ### 5.4 Environment variables for remote and GitHub builds
 
 Local deploys read your local `.env` as always. Remote and GitHub builds run in AWS and never receive `.env` files, so
@@ -505,7 +539,7 @@ Removes GitHub webhooks, empties both buckets and deletes the stack. `-y, --yes`
 ### `domain add`, `ls`, `verify`, `rm`
 | Command | Options | What it does |
 |---|---|---|
-| `domain add <host>` | `-p, --project`, `--manual`, `--no-wait` | Creates the certificate and distribution, and the DNS records when a Route 53 zone exists. Rerun to continue. `--no-wait` returns instead of waiting for the certificate and DNS |
+| `domain add <host>` | `-p, --project`, `--preview` (wildcard preview domain, no project), `--manual`, `--no-wait` | Creates the certificate and distribution, and the DNS records when a Route 53 zone exists. Rerun to continue. `--no-wait` returns instead of waiting for the certificate and DNS |
 | `domain ls` | | Hosts with project, stack status, certificate status and whether DNS reaches the distribution |
 | `domain verify <host>` | | Checks the stack, certificate, project claim and DNS |
 | `domain rm <host>` | `-y, --yes` | Removes the route, distribution stack and certificate, and only the DNS records this tool created |
@@ -518,10 +552,15 @@ Removes GitHub webhooks, empties both buckets and deletes the stack. `-y, --yes`
 | `env ls` | `-p, --project`, `--json` | Lists names and which scopes have a value; values are never shown |
 | `env rm <name>` | `-p, --project`, `--preview` | Removes a variable |
 
+### `previews`, `previews rm`
+`deployer previews [-p <project>] [--json]` lists the preview domain and the open previews.
+`deployer previews rm <pr> -p <project>` takes one down. Previews are made by `github connect --previews` plus a
+`domain add "*.…" --preview` (section 5.3).
+
 ### `github connect`, `deploy`, `disconnect`, `rotate-secret`
 | Command | Options | What it does |
 |---|---|---|
-| `github connect` | `-p, --project`, `--repo <owner/name>`, `--branch`, `--host`, `--install-command`, `--build-command`, `--reuse-token` | Validates the token, stores it, registers the push webhook, saves the connection. `--branch` defaults to the repository's default branch. `--reuse-token` uses the token already stored instead of asking. |
+| `github connect` | `-p, --project`, `--repo <owner/name>`, `--branch`, `--host`, `--install-command`, `--build-command`, `--reuse-token`, `--previews` | Validates the token, stores it, registers the webhook (push events, plus pull request events with `--previews`), saves the connection. `--branch` defaults to the repository's default branch. `--reuse-token` uses the token already stored instead of asking. |
 | `github deploy` | `-p, --project`, `--detach` | Builds the current head of the connected branch now |
 | `github disconnect` | `-p, --project` | Stops deploying from GitHub. The webhook is removed with the last project on a repository |
 | `github rotate-secret` | none | Replaces the webhook's signing secret and creates or updates the webhook on every connected repository |
@@ -622,9 +661,11 @@ settings keep S3 storage bounded.
 
 - **The CloudFront URL is one shared address**: the last project deployed to it wins. Give each project a custom
   domain (section 5.5) to avoid that.
-- **No preview URLs yet.**
-- **Custom domains are one distribution each**, so they count against your account's CloudFront quota, and wildcard
-  domains are not supported yet.
+- **Preview comments need a token with pull request access.** Without it the preview still works; only the comment is missing (see the engine's log).
+- **Custom domains are one distribution each**, so they count against your account's CloudFront quota. The only
+  wildcard domain is the one for previews (`--preview`).
+- **One preview domain is used per stack** (the first one registered); a preview name is `<project>-pr-<number>`, so
+  the project name plus that must fit in 63 characters.
 - **Static React only.** No Next.js or server rendering.
 - **Remote builds are slow to start** (about 1.5 minutes before your build begins).
 - **Missing files return a 403** XML page from S3 instead of a 404.
@@ -713,13 +754,13 @@ table uses a pure-JavaScript implementation, so nothing native is installed or s
 | Build-time environment variables (production and preview scopes) | done |
 | Local dashboard (`deployer dashboard`): deploy from a folder or GitHub, rollback, domains, variables, live logs | done, driven through its API against a real account |
 | Custom domains: Route 53 automatic and manual DNS, side-by-side projects, removal | done, on a real delegated subdomain |
+| Pull request previews: wildcard domain, webhook, engine, comment, `previews` commands, dashboard tab | built; wildcard domain and the webhook-to-build path verified live, a real pull request not yet |
 
 **Next (planned):**
 
-1. **Pull-request preview URLs.**
-2. **A least-privilege policy** for the person running the CLI, before any public release.
-3. **A hosted or self-hosted dashboard** that connects to your AWS account (a cross-account role, with no raw keys).
+1. **A least-privilege policy** for the person running the CLI, before any public release.
+2. **A hosted or self-hosted dashboard** that connects to your AWS account (a cross-account role, with no raw keys).
    The local dashboard (section 5.10) already exists and would be the base for it.
-4. **Other static frameworks** (Vue, Svelte, Astro static), then **server-rendered frameworks** such as Next.js.
+3. **Other static frameworks** (Vue, Svelte, Astro static), then **server-rendered frameworks** such as Next.js.
 
 License: Apache-2.0.

@@ -4,14 +4,15 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ReactNode, useState } from 'react';
 import { Badge, Confirm, ErrorNotice, StatusBadge } from '@/components/bits';
-import { BuildRow, DomainRow, EnvRow, Manifest, siteUrl, startAction, timeAgo, useApi } from '@/lib/client';
+import { BuildRow, DomainRow, EnvRow, Manifest, PreviewsInfo, siteUrl, startAction, timeAgo, useApi } from '@/lib/client';
 
-type Tab = 'deployments' | 'domains' | 'environment' | 'github' | 'builds';
+type Tab = 'deployments' | 'domains' | 'environment' | 'github' | 'previews' | 'builds';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'deployments', label: 'Deployments' },
   { id: 'domains', label: 'Domains' },
   { id: 'environment', label: 'Environment' },
   { id: 'github', label: 'GitHub' },
+  { id: 'previews', label: 'Previews' },
   { id: 'builds', label: 'Builds' },
 ];
 
@@ -66,6 +67,7 @@ export default function ProjectPage() {
       {tab === 'domains' && <Domains name={name} run={run} />}
       {tab === 'environment' && <Environment name={name} run={run} />}
       {tab === 'github' && <Github name={name} manifest={manifest.data} run={run} />}
+      {tab === 'previews' && <Previews name={name} manifest={manifest.data} run={run} />}
       {tab === 'builds' && <Builds name={name} run={run} />}
 
       {deleting && (
@@ -104,7 +106,7 @@ function Deployments({ name, manifest, run }: { name: string; manifest?: Manifes
           <tbody>
             {rows.map((d) => (
               <tr key={d.id}>
-                <td className="mono">{d.id}</td>
+                <td className="mono">{d.id}{d.preview !== undefined && <> <Badge>preview #{d.preview}</Badge></>}</td>
                 <td>{timeAgo(d.createdAt)}</td>
                 <td>{d.files}</td>
                 <td>{(liveOf.get(d.id) ?? []).map((h) => <div key={h}><Badge kind="ok">live</Badge> {h}</div>)}</td>
@@ -310,6 +312,7 @@ function Github({ name, manifest, run }: { name: string; manifest?: Manifest; ru
           <dt>Deploys to</dt><dd>{source.host ?? ((manifest.domains ?? []).join(', ') || 'the shared CloudFront address')}</dd>
           <dt>Install command</dt><dd>{source.installCommand ?? <span className="muted">detected</span>}</dd>
           <dt>Build command</dt><dd>{source.buildCommand ?? <span className="muted">detected</span>}</dd>
+          <dt>Pull request previews</dt><dd>{source.previews ? 'on' : <span className="muted">off (see the Previews tab)</span>}</dd>
         </dl>
         <p className="muted small" style={{ marginTop: 10 }}>Every push to {source.branch} builds in your AWS account and goes live.</p>
         <div className="row">
@@ -351,6 +354,102 @@ function Builds({ name, run }: { name: string; run: Run }): ReactNode {
           </tbody>
         </table>
       </div>
+    </>
+  );
+}
+
+function Previews({ name, manifest, run }: { name: string; manifest?: Manifest; run: Run }) {
+  const { data, error, loading } = useApi<PreviewsInfo>(`/api/projects/${name}/previews`, { interval: 15000 });
+  const [host, setHost] = useState('');
+  const [manual, setManual] = useState(false);
+  const [removing, setRemoving] = useState<number>();
+  const source = manifest?.source;
+  const hasDomain = (data?.bases.length ?? 0) > 0;
+
+  return (
+    <>
+      <ErrorNotice message={error} />
+      <div className="card">
+        <h2>Pull request previews</h2>
+        <p className="muted small">
+          Each open pull request into the connected branch gets its own address (<span className="mono">{name}-pr-&lt;number&gt;.&lt;preview domain&gt;</span>),
+          rebuilt on every push and removed when the pull request is closed. A link is posted on the pull request.
+        </p>
+        {!source && <p>Connect this project to a GitHub repository first (GitHub tab).</p>}
+        {source && (
+          <div className="row">
+            <Badge kind={source.previews ? 'ok' : undefined}>{source.previews ? 'on' : 'off'}</Badge>
+            {source.previews ? (
+              <button onClick={() => void run({ action: 'github-previews', enable: false })}>Turn off</button>
+            ) : (
+              <button className="primary" disabled={!hasDomain} onClick={() => void run({ action: 'github-previews', enable: true })}>Turn on</button>
+            )}
+            {!hasDomain && !source.previews && <span className="muted small">Add a preview domain below first.</span>}
+          </div>
+        )}
+        <p className="muted small" style={{ marginTop: 8 }}>
+          Only pull requests from a branch of the same repository are built. Preview builds receive the project&apos;s production
+          variables, with any preview-only values laid over them. The GitHub token needs &quot;Pull requests: Read and write&quot; so the
+          comment can be posted.
+        </p>
+      </div>
+
+      <div className="card tablewrap">
+        <table>
+          <thead><tr><th>Pull request</th><th>Address</th><th>Commit</th><th>Updated</th><th /></tr></thead>
+          <tbody>
+            {data?.previews.map((p) => (
+              <tr key={p.pr}>
+                <td>
+                  {source ? <a href={`https://github.com/${source.repo}/pull/${p.pr}`} target="_blank" rel="noreferrer">#{p.pr}</a> : `#${p.pr}`}
+                </td>
+                <td><a href={p.url} target="_blank" rel="noreferrer">{p.host}</a> {!p.serving && <Badge kind="warn">not served</Badge>}</td>
+                <td className="mono">{p.sha.slice(0, 7)}</td>
+                <td>{timeAgo(p.updatedAt)}</td>
+                <td><button className="small danger" onClick={() => setRemoving(p.pr)}>Remove</button></td>
+              </tr>
+            ))}
+            {data && data.previews.length === 0 && <tr><td colSpan={5} className="muted">No open previews.</td></tr>}
+            {loading && !data && <tr><td colSpan={5} className="muted">Loading...</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="card">
+        <h2>Preview domain</h2>
+        {hasDomain ? (
+          <p>Previews are served on {data!.bases.map((b) => <span key={b} className="mono">*.{b} </span>)}</p>
+        ) : (
+          <>
+            <p className="muted small">
+              One wildcard domain serves the previews of every project. It needs a certificate and a distribution of its own, like a
+              custom domain (5 to 15 minutes), and its DNS can live in Route 53 or elsewhere.
+            </p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void run({ action: 'preview-domain-add', host, manual });
+              }}
+            >
+              <label className="field">
+                <span>Wildcard domain</span>
+                <input type="text" value={host} onChange={(e) => setHost(e.target.value)} placeholder="*.preview.example.com" spellCheck={false} required />
+              </label>
+              <label className="check">
+                <input type="checkbox" checked={manual} onChange={(e) => setManual(e.target.checked)} />
+                <span>I will add the DNS records myself (do not touch Route 53)</span>
+              </label>
+              <button className="primary" disabled={!host.trim()}>Add preview domain</button>
+            </form>
+          </>
+        )}
+      </div>
+
+      {removing !== undefined && (
+        <Confirm title={`Remove the preview of #${removing}?`} action="Remove preview" danger onCancel={() => setRemoving(undefined)} onConfirm={() => run({ action: 'preview-rm', pr: removing })}>
+          <p>Takes its address down and deletes its files. A new push to the pull request builds it again.</p>
+        </Confirm>
+      )}
     </>
   );
 }

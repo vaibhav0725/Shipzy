@@ -2,23 +2,22 @@ import { randomBytes } from 'node:crypto';
 import {
   assertProjectName,
   DEFAULT_KEEP,
-  listGithubConnections,
-  newDeploymentId,
-  readManifest,
-  resolveTargetHosts,
-  startBuild,
-  updateManifest,
-} from '@deployer/core';
-import { getOutputs, GlobalOptions, StackOutputs } from '../lib/aws.js';
-import { projectBuildEnv } from '../lib/build-env.js';
-import {
   explainGithubError,
   getRepo,
   headSha,
+  listGithubConnections,
+  newDeploymentId,
   pingWebhook,
+  readManifest,
+  readPreviewBases,
   REPO_RE,
+  resolveTargetHosts,
+  startBuild,
+  updateManifest,
   upsertWebhook,
-} from '../lib/github.js';
+} from '@deployer/core';
+import { getOutputs, GlobalOptions, StackOutputs } from '../lib/aws.js';
+import { projectBuildEnv } from '../lib/build-env.js';
 import { promptHidden } from '../lib/prompt.js';
 import { getSecret, putSecret } from '../lib/secrets.js';
 import { removeRepoWebhook } from '../lib/webhooks.js';
@@ -53,6 +52,16 @@ export interface ConnectOptions {
   installCommand?: string;
   buildCommand?: string;
   reuseToken?: boolean;
+  /** build a preview of every pull request that targets the branch */
+  previews?: boolean;
+}
+
+/** The events GitHub should send: pushes always, pull requests when any project on the repository wants previews. */
+async function webhookEvents(bucket: string, repo: string, alsoPreviews = false): Promise<string[]> {
+  const wants =
+    alsoPreviews ||
+    (await listGithubConnections(bucket)).some((c) => c.source.previews && c.source.repo.toLowerCase() === repo.toLowerCase());
+  return wants ? ['push', 'pull_request'] : ['push'];
 }
 
 export async function connect(opts: ConnectOptions, global: GlobalOptions): Promise<void> {
@@ -75,7 +84,8 @@ export async function connect(opts: ConnectOptions, global: GlobalOptions): Prom
   const webhookSecret = await getSecret(stack.webhookSecretArn);
   let webhookNote: string;
   try {
-    const hook = await upsertWebhook(token, repo.full_name, stack.webhookUrl, webhookSecret);
+    const events = await webhookEvents(out.bucket, repo.full_name, opts.previews);
+    const hook = await upsertWebhook(token, repo.full_name, stack.webhookUrl, webhookSecret, events);
     await pingWebhook(token, repo.full_name, hook.id).catch(() => undefined);
     webhookNote = `webhook ${hook.created ? 'created' : 'updated'} (id ${hook.id})`;
   } catch (err) {
@@ -86,7 +96,7 @@ export async function connect(opts: ConnectOptions, global: GlobalOptions): Prom
         `  Payload URL:  ${stack.webhookUrl}\n` +
         '  Content type: application/json\n' +
         `  Secret:       aws secretsmanager get-secret-value --secret-id ${stack.webhookSecretArn} --query SecretString --output text\n` +
-        '  Events:       Just the push event\n' +
+        `  Events:       ${opts.previews ? 'Pushes and Pull requests' : 'Just the push event'}\n` +
         'A token with "Webhooks: read and write" (fine-grained) or admin:repo_hook (classic) lets the CLI do this for you:\n' +
         '  fix the token\'s permissions, then run `deployer github rotate-secret`.',
     );
@@ -101,11 +111,19 @@ export async function connect(opts: ConnectOptions, global: GlobalOptions): Prom
       host,
       installCommand: opts.installCommand,
       buildCommand: opts.buildCommand,
+      previews: opts.previews || undefined,
     };
   });
 
   console.log(`\nConnected ${opts.project} to ${repo.full_name} (${branch}): ${webhookNote}.`);
   console.log(`Every push to ${branch} now builds and deploys to ${host ?? out.domain}.`);
+  if (opts.previews) {
+    console.log(`Every pull request into ${branch} now gets its own preview URL, removed when the pull request closes.`);
+    console.log('The GitHub token needs "Pull requests: Read and write" for the preview comment (fine-grained token) or the repo scope (classic).');
+    if ((await readPreviewBases(out.bucket)).length === 0) {
+      console.warn('\nNo preview domain is set up yet, so no preview can be served. Add one with:\n  deployer domain add "*.preview.<your domain>" --preview');
+    }
+  }
   console.log(`Deploy the current head now with: deployer github deploy -p ${opts.project}`);
 }
 
@@ -180,7 +198,7 @@ export async function rotateSecret(global: GlobalOptions): Promise<void> {
   let failed = 0;
   for (const repo of repos) {
     try {
-      const hook = await upsertWebhook(token, repo, stack.webhookUrl, secret);
+      const hook = await upsertWebhook(token, repo, stack.webhookUrl, secret, await webhookEvents(out.bucket, repo));
       console.log(`  ${repo}: webhook ${hook.created ? 'created' : 'updated'}`);
     } catch (err) {
       failed++;

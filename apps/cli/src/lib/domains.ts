@@ -1,6 +1,16 @@
 import * as dns from 'node:dns';
 import { ListStacksCommand } from '@aws-sdk/client-cloudformation';
-import { deleteRoute, listManifestProjects, readManifest, updateManifest } from '@deployer/core';
+import {
+  deleteRoute,
+  isPreviewHost,
+  listManifestProjects,
+  listRoutes,
+  readManifest,
+  readPreviewBases,
+  removePreview,
+  updateManifest,
+  updatePreviewBases,
+} from '@deployer/core';
 import { deleteCertificate, describeCertificate, findCertificate } from './acm.js';
 import { cloudFormation, errorMessage, findStack, GlobalOptions, StackOutputs } from './aws.js';
 import { outputsOf, paramsOf, removeStack } from './cfn.js';
@@ -19,7 +29,7 @@ const LABEL = /^(?!-)[a-z0-9-]{1,63}(?<!-)$/;
 export function validateHost(raw: string, allowWildcard = false): string {
   const host = raw.trim().toLowerCase().replace(/\.$/, '');
   const wildcard = host.startsWith('*.');
-  if (wildcard && !allowWildcard) throw new Error(`"${raw}": wildcard domains are only for previews.`);
+  if (wildcard && !allowWildcard) throw new Error(`"${raw}": wildcard domains are only for previews (use: deployer domain add "${raw}" --preview).`);
   const labels = (wildcard ? host.slice(2) : host).split('.');
   if (
     labels.length < 2 ||
@@ -118,11 +128,29 @@ export async function removeDomain(out: StackOutputs, global: GlobalOptions, hos
   const distributionDomain = stack ? outputsOf(stack)['DistributionDomain'] : undefined;
   const certArn = (stack && paramsOf(stack)['CertificateArn']) || (await findCertificate(host));
 
-  try {
-    await deleteRoute(out.kvsArn, host);
-    notes.push(`Removed the route for ${host}.`);
-  } catch {
-    // no route was set
+  if (host.startsWith('*.')) {
+    // A preview domain: every preview served on it goes first, then its place in the list of preview domains.
+    const base = host.slice(2);
+    for (const project of await listManifestProjects(out.bucket)) {
+      const { previews } = await readManifest(out.bucket, project);
+      for (const [pr, info] of Object.entries(previews ?? {})) {
+        if (isPreviewHost(info.host, [base]) && (await removePreview(out, project, Number(pr)))) {
+          notes.push(`Removed the preview of ${project} #${pr}.`);
+        }
+      }
+    }
+    for (const r of await listRoutes(out.kvsArn)) if (isPreviewHost(r.host, [base])) await deleteRoute(out.kvsArn, r.host);
+    if ((await readPreviewBases(out.bucket)).includes(base)) {
+      await updatePreviewBases(out.bucket, (bases) => bases.filter((b) => b !== base));
+      notes.push(`${host} is no longer a preview domain.`);
+    }
+  } else {
+    try {
+      await deleteRoute(out.kvsArn, host);
+      notes.push(`Removed the route for ${host}.`);
+    } catch {
+      // no route was set
+    }
   }
 
   for (const project of await listManifestProjects(out.bucket)) {

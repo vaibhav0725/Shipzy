@@ -1,4 +1,4 @@
-import { listRoutes, readManifest, routeTarget, setRoute, updateManifest } from '@deployer/core';
+import { projectRoutes, readManifest, routeTarget, setRoute, updateManifest } from '@deployer/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 
 export interface RollbackOptions {
@@ -13,8 +13,8 @@ export async function rollback(opts: RollbackOptions, global: GlobalOptions): Pr
 
   // A rollback moves what the project is serving right now. That is read from the routing table (the source of
   // truth), never guessed: a project deployed with --host is not on the shared CloudFront address, and rolling
-  // back must not put its old version there.
-  const owned = (await listRoutes(out.kvsArn)).filter((r) => r.target.startsWith(`${opts.project}/`));
+  // back must not put its old version there. Pull request previews are not production hosts and are left alone.
+  const owned = (await projectRoutes(out, opts.project)).production;
   const hosts = opts.host ? [opts.host.toLowerCase()] : owned.map((r) => r.host.toLowerCase());
   if (hosts.length === 0) {
     throw new Error(`"${opts.project}" is not live anywhere, so there is nothing to roll back. Pass --host <hostname> --to <id> to serve a deployment.`);

@@ -74,14 +74,20 @@ export async function headSha(token: string, repo: string, branch: string): Prom
 
 const hookConfig = (url: string, secret: string) => ({ url, content_type: 'json', secret, insecure_ssl: '0' });
 
-/** Creates the push webhook, or updates it in place if one for this URL already exists. */
-export async function upsertWebhook(token: string, repo: string, url: string, secret: string) {
+/** Creates the webhook, or updates it in place if one for this URL already exists. */
+export async function upsertWebhook(
+  token: string,
+  repo: string,
+  url: string,
+  secret: string,
+  events: string[] = ['push'],
+) {
   const hooks = await request<Hook[]>(token, 'GET', `/repos/${repo}/hooks?per_page=100`);
   const existing = hooks.find((h) => h.config?.url === url);
   if (existing) {
     await request(token, 'PATCH', `/repos/${repo}/hooks/${existing.id}`, {
       config: hookConfig(url, secret),
-      events: ['push'],
+      events,
       active: true,
     });
     return { id: existing.id, created: false };
@@ -89,7 +95,7 @@ export async function upsertWebhook(token: string, repo: string, url: string, se
   const hook = await request<Hook>(token, 'POST', `/repos/${repo}/hooks`, {
     name: 'web',
     active: true,
-    events: ['push'],
+    events,
     config: hookConfig(url, secret),
   });
   return { id: hook.id, created: true };
@@ -116,4 +122,34 @@ export function explainGithubError(err: unknown, repo: string): Error {
     return new Error(`GitHub said ${err.status}: ${err.message}`);
   }
   return err instanceof Error ? err : new Error(String(err));
+}
+
+export interface PullRequest {
+  state: 'open' | 'closed';
+  number: number;
+  head: { sha: string; ref: string; repo: { full_name: string } | null };
+  base: { ref: string };
+}
+
+export const getPullRequest = (token: string, repo: string, pr: number) =>
+  request<PullRequest>(token, 'GET', `/repos/${repo}/pulls/${pr}`);
+
+interface Comment {
+  id: number;
+  body?: string;
+}
+
+/**
+ * Creates the one comment this tool keeps on a pull request, or edits it in place. The comment is found by a hidden
+ * marker in its body, so repeated pushes update it instead of adding a new one each time.
+ */
+export async function upsertComment(token: string, repo: string, pr: number, marker: string, body: string): Promise<number> {
+  const text = `${marker}\n${body}`;
+  const comments = await request<Comment[]>(token, 'GET', `/repos/${repo}/issues/${pr}/comments?per_page=100`);
+  const existing = comments.find((c) => c.body?.startsWith(marker));
+  if (existing) {
+    await request(token, 'PATCH', `/repos/${repo}/issues/comments/${existing.id}`, { body: text });
+    return existing.id;
+  }
+  return (await request<Comment>(token, 'POST', `/repos/${repo}/issues/${pr}/comments`, { body: text })).id;
 }

@@ -11,13 +11,14 @@ export interface ProjectSummary {
   lastDeployedAt?: string;
   bytes: number;
   files: number;
-  source?: { repo: string; branch: string };
+  source?: { repo: string; branch: string; previews: boolean };
+  previews: number;
 }
 export interface Manifest {
   project: string;
-  deployments: { id: string; createdAt: string; files: number }[];
+  deployments: { id: string; createdAt: string; files: number; preview?: number }[];
   live: Record<string, string>;
-  source?: { type: 'github'; repo: string; branch: string; host?: string; installCommand?: string; buildCommand?: string };
+  source?: { type: 'github'; repo: string; branch: string; host?: string; installCommand?: string; buildCommand?: string; previews?: boolean };
   env?: { production: string[]; preview: string[] };
   domains?: string[];
 }
@@ -36,6 +37,8 @@ export interface Status {
   bytes: number;
 }
 export interface DomainRow { host: string; project: string; stack: string; certificate: string; dns: string; distribution?: string }
+export interface PreviewRow { project: string; pr: number; host: string; url: string; deployment: string; sha: string; updatedAt: string; serving: boolean }
+export interface PreviewsInfo { bases: string[]; previews: PreviewRow[] }
 export interface EnvRow { name: string; production: boolean; preview: boolean }
 export interface BuildRow { build: string; id: string; project: string; status: string; source: string; deployment: string; startedAt?: string; duration: string }
 export interface JobInfo { id: string; label: string; project?: string; status: 'running' | 'succeeded' | 'failed' | 'cancelled'; startedAt: string; endedAt?: string; exitCode?: number | null }

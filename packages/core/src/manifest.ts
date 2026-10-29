@@ -11,6 +11,17 @@ export interface Deployment {
   id: string;
   createdAt: string;
   files: number;
+  /** the pull request this deployment is a preview of; absent for production deployments */
+  preview?: number;
+}
+
+/** The live preview of one open pull request. */
+export interface PreviewInfo {
+  host: string;
+  /** deployment currently served */
+  id: string;
+  sha: string;
+  updatedAt: string;
 }
 
 export interface GithubSource {
@@ -23,6 +34,8 @@ export interface GithubSource {
   /** replace the detected install/build step, as with `deploy --install-command` */
   installCommand?: string;
   buildCommand?: string;
+  /** build a preview of every pull request that targets `branch` */
+  previews?: boolean;
 }
 
 export interface Manifest {
@@ -36,6 +49,8 @@ export interface Manifest {
   env?: ManifestEnv;
   /** custom domains this project is served on (each has its own distribution; see `deployer domain`) */
   domains?: string[];
+  /** open pull requests that have a preview, by pull request number */
+  previews?: Record<string, PreviewInfo>;
 }
 
 export const MANIFEST_PREFIX = '.deployer/';

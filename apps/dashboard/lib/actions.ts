@@ -160,13 +160,62 @@ export async function planAction(body: Body): Promise<ActionPlan> {
       };
     }
 
+    case 'preview-domain-add': {
+      const host = v.previewDomain(body.host);
+      return {
+        label: `Add preview domain ${host}`,
+        steps: [{ args: ['domain', 'add', host, '--preview', ...(v.flag(body.manual) ? ['--manual'] : [])] }],
+      };
+    }
+
+    case 'github-previews': {
+      // Turning previews on or off re-runs the connection with the settings it already has.
+      const project = v.project(body.project);
+      const enable = v.flag(body.enable);
+      const info = await runJson<{ source?: { repo: string; branch: string; host?: string; installCommand?: string; buildCommand?: string } }>(
+        ['list', '-p', project, '--json'],
+        0,
+      );
+      const src = info.source;
+      if (!src) throw new InputError(`${project} is not connected to a GitHub repository.`);
+      return {
+        label: `${enable ? 'Turn on' : 'Turn off'} previews for ${project}`,
+        project,
+        steps: [
+          {
+            args: [
+              'github',
+              'connect',
+              '-p',
+              project,
+              '--repo',
+              v.repo(src.repo),
+              '--branch',
+              v.branch(src.branch),
+              ...(src.host ? ['--host', v.host(src.host)] : []),
+              ...withValue('--install-command', v.command(src.installCommand, 'The install command')),
+              ...withValue('--build-command', v.command(src.buildCommand, 'The build command')),
+              '--reuse-token',
+              ...(enable ? ['--previews'] : []),
+            ],
+          },
+        ],
+      };
+    }
+
+    case 'preview-rm': {
+      const project = v.project(body.project);
+      const pr = v.pullRequest(body.pr);
+      return { label: `Remove the preview of ${project} #${pr}`, project, steps: [{ args: ['previews', 'rm', pr, '-p', project] }] };
+    }
+
     case 'domain-verify': {
-      const host = v.host(body.host);
+      const host = v.anyHost(body.host);
       return { label: `Check domain ${host}`, steps: [{ args: ['domain', 'verify', host] }] };
     }
 
     case 'domain-rm': {
-      const host = v.host(body.host);
+      const host = v.anyHost(body.host);
       return { label: `Remove domain ${host}`, steps: [{ args: ['domain', 'rm', host, '--yes'] }] };
     }
 

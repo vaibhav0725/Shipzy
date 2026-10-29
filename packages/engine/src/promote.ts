@@ -13,11 +13,20 @@ import {
   updateManifest,
 } from '@deployer/core';
 import { env } from './env.js';
+import {
+  previewFailed,
+  promotePreview,
+  removePreviewFor,
+  type PreviewFailedEvent,
+  type PreviewPromoteEvent,
+  type PreviewRemoveEvent,
+} from './preview.js';
 
 export interface PromoteEvent {
   action: 'promote';
   project: string;
   id: string;
+  preview?: undefined;
   /** hosts to make live; when absent, the project's domains (else the CloudFront URL) */
   hosts?: string[];
   /** older callers send a single host */
@@ -45,7 +54,14 @@ async function assertUploaded(bucket: string, target: string): Promise<void> {
  * Called by the build once a deployment folder is fully uploaded: point the host at it,
  * record it, then prune. Same order as the CLI's `deploy`.
  */
-export async function promote(event: PromoteEvent) {
+export async function promote(event: PromoteEvent | PreviewPromoteEvent | PreviewRemoveEvent | PreviewFailedEvent) {
+  if (event.action === 'preview-remove') return removePreviewFor(event);
+  if (event.action === 'preview-failed') return previewFailed(event);
+  if ('preview' in event && event.preview) return promotePreview(event);
+  return promoteProduction(event as PromoteEvent);
+}
+
+async function promoteProduction(event: PromoteEvent) {
   const site = { bucket: env('SITES_BUCKET'), kvsArn: env('KVS_ARN') };
   assertProjectName(event.project);
   if (!ID_RE.test(event.id)) throw new Error(`Invalid deployment id "${event.id}"`);

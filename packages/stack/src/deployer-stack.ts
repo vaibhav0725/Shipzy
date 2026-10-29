@@ -165,8 +165,11 @@ export class DeployerStack extends cdk.Stack {
       SITES_BUCKET: bucket.bucketName,
       KVS_ARN: routes.keyValueStoreArn,
       DEFAULT_HOST: distribution.distributionDomainName,
+      GITHUB_TOKEN_SECRET_ARN: githubToken.secretArn,
     });
     bucket.grantReadWrite(engine);
+    // Pull request previews: the engine checks the pull request is still open and comments on it.
+    githubToken.grantRead(engine);
     engine.addToRolePolicy(
       new iam.PolicyStatement({
         actions: [
@@ -235,8 +238,12 @@ export class DeployerStack extends cdk.Stack {
       BUILD_PROJECT: project.projectName,
       WEBHOOK_SECRET_ARN: webhookSecret.secretArn,
       STACK_NAME: cdk.Aws.STACK_NAME,
+      ENGINE_FUNCTION: engine.functionName,
     });
     bucket.grantRead(webhook, '.deployer/*');
+    bucket.grantRead(webhook, '.deployer-meta/*');
+    // A closed pull request asks the engine (which holds the routing and storage permissions) to remove its preview.
+    engine.grantInvoke(webhook);
     webhookSecret.grantRead(webhook);
     webhook.addToRolePolicy(new iam.PolicyStatement({ actions: ['codebuild:StartBuild'], resources: [project.projectArn] }));
     const webhookUrl = webhook.addFunctionUrl({ authType: lambda.FunctionUrlAuthType.NONE });

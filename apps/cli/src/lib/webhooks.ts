@@ -1,5 +1,5 @@
 import { StackOutputs } from './aws.js';
-import { explainGithubError, removeWebhook } from './github.js';
+import { explainGithubError, removeWebhook } from '@deployer/core';
 import { getSecret } from './secrets.js';
 
 /**

@@ -14,6 +14,7 @@ import { connect, disconnect, githubDeploy, rotateSecret } from './commands/gith
 import { init } from './commands/init.js';
 import { list } from './commands/list.js';
 import { logs } from './commands/logs.js';
+import { previewsList, previewsRemove } from './commands/previews.js';
 import { pruneCommand } from './commands/prune.js';
 import { rollback } from './commands/rollback.js';
 import { status } from './commands/status.js';
@@ -98,7 +99,8 @@ const domain = program.command('domain').description('Serve a project on your ow
 domain
   .command('add <host>')
   .description('Add a custom domain to a project (creates the certificate and distribution; DNS too, if the domain is in Route 53)')
-  .requiredOption('-p, --project <name>')
+  .option('-p, --project <name>', 'the project that serves this domain')
+  .option('--preview', 'a wildcard domain (e.g. "*.preview.example.com") that serves pull request previews of every project')
   .option('--manual', 'print the DNS records instead of creating them, even if a Route 53 zone exists')
   .option('--no-wait', 'do not wait for the certificate and DNS; rerun the command to continue')
   .action((host, opts) => domainAdd(host, opts, globals()));
@@ -165,6 +167,7 @@ github
   .option('--install-command <cmd>', 'replace the install step for these builds')
   .option('--build-command <cmd>', 'replace the build step for these builds')
   .option('--reuse-token', 'use the GitHub token already stored in your account instead of asking for one')
+  .option('--previews', 'also build a preview URL for every pull request into the branch (needs a preview domain)')
   .action((opts) => connect(opts, globals()));
 
 github
@@ -184,6 +187,22 @@ github
   .description('Stop deploying a project from GitHub and remove its webhook')
   .requiredOption('-p, --project <name>')
   .action((opts) => disconnect(opts, globals()));
+
+const previews = program.command('previews').description('Pull request previews: one URL per open pull request');
+
+previews
+  .command('ls', { isDefault: true })
+  .alias('list')
+  .description('List the preview domain and the open previews')
+  .option('-p, --project <name>')
+  .option('--json', 'machine-readable output')
+  .action((opts) => previewsList(opts, globals()));
+
+previews
+  .command('rm <pr>')
+  .description('Take one preview down by hand (closing the pull request does this too)')
+  .requiredOption('-p, --project <name>')
+  .action((pr, opts) => previewsRemove(pr, opts, globals()));
 
 program
   .command('rollback')

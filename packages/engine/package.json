@@ -15,6 +15,7 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
+    "@aws-sdk/client-lambda": "^3.1159.0",
     "@aws-sdk/client-s3": "^3.1159.0",
     "@aws-sdk/client-secrets-manager": "^3.1159.0",
     "@deployer/core": "*"

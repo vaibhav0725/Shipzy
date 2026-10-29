@@ -30,8 +30,13 @@ export async function prune(out: SiteRefs, project: string, opts: PruneOptions):
   const isProtected = (id: string) =>
     Object.values(manifest.live).includes(id) || routed.has(routeTarget(project, id));
 
-  const newest = new Set(manifest.deployments.slice(-opts.keep).map((d) => d.id));
-  const expired = manifest.deployments.filter((d) => !newest.has(d.id) && !isProtected(d.id)).map((d) => d.id);
+  // Pull request previews do not count towards the retention window (a busy PR would push production versions out
+  // of it), and a preview deployment that is no longer served has been superseded by the PR's next push.
+  const production = manifest.deployments.filter((d) => d.preview === undefined);
+  const newest = new Set(production.slice(-opts.keep).map((d) => d.id));
+  const expired = manifest.deployments
+    .filter((d) => (d.preview === undefined ? !newest.has(d.id) : true) && !isProtected(d.id))
+    .map((d) => d.id);
 
   const recorded = new Set(manifest.deployments.map((d) => d.id));
   const cutoff = Date.now() - opts.graceMinutes * 60_000;

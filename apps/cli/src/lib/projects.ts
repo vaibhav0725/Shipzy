@@ -1,4 +1,4 @@
-import { listManifestProjects, listRoutes, prefixSize, readManifest } from '@deployer/core';
+import { isPreviewHost, listManifestProjects, listRoutes, prefixSize, readManifest, readPreviewBases } from '@deployer/core';
 import { StackOutputs } from './aws.js';
 
 export interface LiveHost {
@@ -16,11 +16,18 @@ export interface ProjectSummary {
   bytes: number;
   files: number;
   /** set when pushes to a GitHub branch deploy this project */
-  source?: { repo: string; branch: string };
+  source?: { repo: string; branch: string; previews: boolean };
+  /** open pull requests with a live preview */
+  previews: number;
 }
 
 export async function listProjects(out: StackOutputs): Promise<ProjectSummary[]> {
-  const [names, routes] = await Promise.all([listManifestProjects(out.bucket), listRoutes(out.kvsArn)]);
+  const [names, allRoutes, bases] = await Promise.all([
+    listManifestProjects(out.bucket),
+    listRoutes(out.kvsArn),
+    readPreviewBases(out.bucket),
+  ]);
+  const routes = allRoutes.filter((r) => !isPreviewHost(r.host, bases));
   // A project can be live without a history file (e.g. its history write failed); still show it.
   const all = new Set([...names, ...routes.map((r) => r.target.split('/')[0]!)]);
 
@@ -41,7 +48,10 @@ export async function listProjects(out: StackOutputs): Promise<ProjectSummary[]>
         lastDeployedAt: manifest.deployments.at(-1)?.createdAt,
         bytes: size.bytes,
         files: size.objects,
-        source: manifest.source ? { repo: manifest.source.repo, branch: manifest.source.branch } : undefined,
+        source: manifest.source
+          ? { repo: manifest.source.repo, branch: manifest.source.branch, previews: Boolean(manifest.source.previews) }
+          : undefined,
+        previews: Object.keys(manifest.previews ?? {}).length,
       };
     }),
   );

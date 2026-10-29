@@ -14,6 +14,8 @@ export interface BuildRequest {
   buildCommand?: string;
   /** the project's own build-time variables, injected from SSM Parameter Store */
   env?: BuildEnvVar[];
+  /** set when the build is a preview of a pull request */
+  preview?: { pr: number };
 }
 
 export interface BuildEnvironmentVariable {
@@ -38,6 +40,7 @@ export function buildEnvironment(req: BuildRequest): BuildEnvironmentVariable[] 
     ['SOURCE_REF', req.source.type === 'github' ? req.source.sha : undefined],
     ['INSTALL_COMMAND', req.installCommand],
     ['BUILD_COMMAND', req.buildCommand],
+    ['DEPLOY_PREVIEW_PR', req.preview === undefined ? undefined : String(req.preview.pr)],
   ];
   const plain = vars
     .filter((v): v is [string, string] => !!v[1])

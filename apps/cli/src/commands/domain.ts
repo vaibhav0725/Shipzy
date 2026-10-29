@@ -2,8 +2,10 @@ import * as fs from 'node:fs';
 import {
   assertProjectName,
   readManifest,
+  readPreviewBases,
   routeTarget,
   setRoute,
+  updatePreviewBases,
   updateManifest,
 } from '@deployer/core';
 import {
@@ -28,6 +30,7 @@ import {
 import { table } from '../lib/format.js';
 import { confirmByTyping } from '../lib/prompt.js';
 import { findZone, upsertAlias, upsertCname } from '../lib/route53.js';
+import { isPreviewHost } from '@deployer/core';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -45,21 +48,33 @@ function deploymentToServe(manifest: { deployments: { id: string }[]; live: Reco
 }
 
 export interface DomainAddOptions {
-  project: string;
+  project?: string;
+  /** a wildcard domain that serves pull request previews instead of belonging to one project */
+  preview?: boolean;
   manual?: boolean;
   /** commander's --no-wait sets this to false */
   wait?: boolean;
 }
 
 export async function domainAdd(hostArg: string, opts: DomainAddOptions, global: GlobalOptions): Promise<void> {
-  const host = validateHost(hostArg);
-  assertProjectName(opts.project);
+  const host = validateHost(hostArg, Boolean(opts.preview));
+  if (opts.preview) {
+    if (opts.project) throw new Error('A preview domain serves every project; drop -p.');
+    if (!host.startsWith('*.')) throw new Error('A preview domain is a wildcard, e.g. "*.preview.example.com".');
+  } else {
+    if (!opts.project) throw new Error('Pass -p <project> (or --preview for a wildcard preview domain).');
+    assertProjectName(opts.project);
+  }
   const out = await getOutputs(global.stackName);
   if (!out.originDomain || !out.oacId || !out.routerFunctionArn) {
     throw new Error('This stack predates custom domains. Run `deployer init` to update it.');
   }
-  const owner = await projectOfDomain(out.bucket, host);
-  if (owner && owner !== opts.project) throw new Error(`${host} already belongs to project "${owner}". Remove it there first: deployer domain rm ${host}`);
+  if (!opts.preview) {
+    const owner = await projectOfDomain(out.bucket, host);
+    if (owner && owner !== opts.project) throw new Error(`${host} already belongs to project "${owner}". Remove it there first: deployer domain rm ${host}`);
+    // Every name under a preview domain is made by the preview system.
+    if (isPreviewHost(host, await readPreviewBases(out.bucket))) throw new Error(`${host} is under a preview domain, which is reserved for pull request previews.`);
+  }
 
   const zone = opts.manual ? undefined : await findZone(host);
   console.log(
@@ -103,7 +118,8 @@ export async function domainAdd(hostArg: string, opts: DomainAddOptions, global:
       OacId: out.oacId,
       RouterFunctionArn: out.routerFunctionArn,
     },
-    tags: { 'deployer:stack': global.stackName, 'deployer:domain': host },
+    // Tag values cannot contain "*".
+    tags: { 'deployer:stack': global.stackName, 'deployer:domain': host.replace(/^\*\./, 'wildcard.') },
   });
   const distribution = outputs['DistributionDomain']!;
 
@@ -119,20 +135,31 @@ export async function domainAdd(hostArg: string, opts: DomainAddOptions, global:
   }
 
   // 4. Claim it for the project and serve what is live now
-  const manifest = await readManifest(out.bucket, opts.project);
+  if (opts.preview) {
+    await updatePreviewBases(out.bucket, (bases) => [...bases, host.slice(2)]);
+    console.log(`${host} is ready for pull request previews. Turn them on for a project with: deployer github connect -p <project> --repo <owner/name> --previews --reuse-token`);
+    if (opts.wait === false) return console.log(`Check later with: deployer domain verify ${host}`);
+    return waitForDns(host, distribution);
+  }
+  const project = opts.project!;
+  const manifest = await readManifest(out.bucket, project);
   const id = deploymentToServe(manifest);
-  if (id) await setRoute(out.kvsArn, host, routeTarget(opts.project, id));
-  await updateManifest(out.bucket, opts.project, (m) => {
+  if (id) await setRoute(out.kvsArn, host, routeTarget(project, id));
+  await updateManifest(out.bucket, project, (m) => {
     m.domains = [...new Set([...(m.domains ?? []), host])];
     if (id) m.live[host] = id;
   });
-  console.log(id ? `${host} now serves ${opts.project} (${id}).` : `${host} is ready; deploy ${opts.project} to put something on it.`);
+  console.log(id ? `${host} now serves ${project} (${id}).` : `${host} is ready; deploy ${project} to put something on it.`);
 
   // 5. Wait for DNS to catch up
   if (opts.wait === false) return console.log(`Check later with: deployer domain verify ${host}`);
+  return waitForDns(host, distribution, true);
+}
+
+async function waitForDns(host: string, distribution: string, serving = false): Promise<void> {
   console.log('Waiting for DNS to reach the distribution...');
   for (let waited = 0; waited <= 600; waited += 15) {
-    if ((await checkDns(host, distribution)) === 'ok') return console.log(`\nLive: https://${host}`);
+    if ((await checkDns(host, distribution)) === 'ok') return console.log(serving ? `\nLive: https://${host}` : `\nDNS for ${host} is in place.`);
     await sleep(15_000);
   }
   console.log(`DNS has not reached the distribution yet (it can take a while). Check with: deployer domain verify ${host}`);
@@ -141,14 +168,16 @@ export async function domainAdd(hostArg: string, opts: DomainAddOptions, global:
 export async function domainList(opts: { project?: string; json?: boolean }, global: GlobalOptions): Promise<void> {
   const out = await getOutputs(global.stackName);
   const stacks = await listDomainStacks(global.stackName);
+  const bases = await readPreviewBases(out.bucket);
   const rows = [];
   for (const s of stacks) {
-    const project = await projectOfDomain(out.bucket, s.host);
+    const isBase = bases.includes(s.host.replace(/^\*\./, ''));
+    const project = isBase ? undefined : await projectOfDomain(out.bucket, s.host);
     if (opts.project && project !== opts.project) continue;
     const cert = s.certificateArn ? await describeCertificate(s.certificateArn).catch(() => undefined) : undefined;
     rows.push({
       host: s.host,
-      project: project ?? '-',
+      project: project ?? (isBase ? '(previews)' : '-'),
       stack: s.status,
       certificate: cert?.status ?? '-',
       dns: s.distributionDomain ? await checkDns(s.host, s.distributionDomain) : 'pending',
@@ -161,17 +190,18 @@ export async function domainList(opts: { project?: string; json?: boolean }, glo
 }
 
 export async function domainVerify(hostArg: string, global: GlobalOptions): Promise<void> {
-  const host = validateHost(hostArg);
+  const host = validateHost(hostArg, true);
   const out = await getOutputs(global.stackName);
   const stack = (await listDomainStacks(global.stackName)).find((s) => s.host === host);
-  const project = await projectOfDomain(out.bucket, host);
+  const isBase = host.startsWith('*.') && (await readPreviewBases(out.bucket)).includes(host.slice(2));
+  const project = isBase ? '(previews)' : await projectOfDomain(out.bucket, host);
   const cert = stack?.certificateArn ? await describeCertificate(stack.certificateArn) : undefined;
   const dns = stack?.distributionDomain ? await checkDns(host, stack.distributionDomain) : 'pending';
 
   const mark = (ok: boolean) => (ok ? 'ok     ' : 'MISSING');
   console.log(`${mark(Boolean(stack))} distribution stack ${stack ? `(${stack.status})` : '- run: deployer domain add ' + host + ' -p <project>'}`);
   console.log(`${mark(cert?.status === 'ISSUED')} certificate ${cert ? `(${cert.status})` : ''}`);
-  console.log(`${mark(Boolean(project))} claimed by a project ${project ? `(${project})` : ''}`);
+  console.log(`${mark(Boolean(project))} ${isBase ? 'registered as a preview domain' : 'claimed by a project'} ${project ? `(${project})` : ''}`);
   console.log(`${mark(dns === 'ok')} DNS ${dns === 'ok' ? 'reaches the distribution' : dns === 'wrong' ? 'resolves, but not to this distribution' : 'is not visible yet'}`);
   if (stack?.distributionDomain && dns !== 'ok') {
     console.log(`\nThe record to have: ${host} CNAME ${stack.distributionDomain} (or an alias to it).`);
@@ -183,13 +213,13 @@ export async function domainVerify(hostArg: string, global: GlobalOptions): Prom
 }
 
 export async function domainRemove(hostArg: string, opts: { yes?: boolean }, global: GlobalOptions): Promise<void> {
-  const host = validateHost(hostArg);
+  const host = validateHost(hostArg, true);
   const out = await getOutputs(global.stackName);
-  const project = await projectOfDomain(out.bucket, host);
+  const project = host.startsWith('*.') ? undefined : await projectOfDomain(out.bucket, host);
   const known = (await listDomainStacks(global.stackName)).some((s) => s.host === host);
   if (!known && !project && !(await findCertificate(host))) throw new Error(`${host} is not a domain of this stack.`);
 
-  if (!opts.yes && !(await confirmByTyping(`This removes ${host}${project ? ` (served by ${project})` : ''}: its distribution, certificate and DNS records made by this tool.`, host))) {
+  if (!opts.yes && !(await confirmByTyping(`This removes ${host}${project ? ` (served by ${project})` : host.startsWith('*.') ? ' and every pull request preview served on it' : ''}: its distribution, certificate and DNS records made by this tool.`, host))) {
     return console.log('Aborted.');
   }
   for (const line of await removeDomain(out, global, host)) console.log(line);
