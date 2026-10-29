@@ -4,9 +4,11 @@ import { fileURLToPath } from 'node:url';
 import {
   CloudFormationClient,
   CreateStackCommand,
+  DeleteStackCommand,
   DescribeStackEventsCommand,
   UpdateStackCommand,
   waitUntilStackCreateComplete,
+  waitUntilStackDeleteComplete,
   waitUntilStackUpdateComplete,
 } from '@aws-sdk/client-cloudformation';
 import { HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
@@ -47,6 +49,14 @@ export async function init(opts: GlobalOptions): Promise<void> {
 
   // 1. Create or update the stack, leaving the engine as it is (the Builds bucket may not exist yet).
   let stack = await findStack(opts.stackName);
+  if (stack?.StackStatus === 'ROLLBACK_COMPLETE') {
+    // A first attempt that failed and rolled back can only be deleted, not updated.
+    console.log(`A previous attempt to create "${opts.stackName}" failed and was rolled back; removing it before retrying...`);
+    const cfn = cloudFormation();
+    await cfn.send(new DeleteStackCommand({ StackName: opts.stackName }));
+    await waitUntilStackDeleteComplete({ client: cfn, maxWaitTime: MAX_WAIT_SECONDS }, { StackName: opts.stackName });
+    stack = undefined;
+  }
   const changed = await applyStack(opts.stackName, templateBody, stack ? (engineKeyOf(stack) ?? '') : '', !stack);
   stack = (await findStack(opts.stackName))!;
   const out = readOutputs(stack);
@@ -143,12 +153,14 @@ async function waitOrExplain(cfn: CloudFormationClient, stackName: string, wait:
     const events = await cfn
       .send(new DescribeStackEventsCommand({ StackName: stackName }))
       .catch(() => undefined);
-    const failures = (events?.StackEvents ?? [])
-      .filter((e) => e.ResourceStatus?.endsWith('FAILED') && e.ResourceStatusReason)
+    // The root cause is a resource that failed on its own; the rest are "cancelled" because it failed.
+    const failed = (events?.StackEvents ?? []).filter((e) => e.ResourceStatus?.endsWith('FAILED') && e.ResourceStatusReason);
+    const rootCauses = failed.filter((e) => !/cancel/i.test(e.ResourceStatusReason ?? ''));
+    const failures = (rootCauses.length ? rootCauses : failed)
       .slice(0, 5)
       .map((e) => `  ${e.LogicalResourceId}: ${e.ResourceStatusReason}`);
     throw new Error(
-      `Stack operation failed (${errorMessage(err)}).` + (failures.length ? `\n${failures.join('\n')}` : ''),
+      failures.length ? `Stack operation failed:\n${failures.join('\n')}` : `Stack operation failed (${errorMessage(err).slice(0, 200)}).`,
     );
   }
 }

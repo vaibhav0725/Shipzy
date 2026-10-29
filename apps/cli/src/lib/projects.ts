@@ -15,6 +15,8 @@ export interface ProjectSummary {
   lastDeployedAt?: string;
   bytes: number;
   files: number;
+  /** set when pushes to a GitHub branch deploy this project */
+  source?: { repo: string; branch: string };
 }
 
 export async function listProjects(out: StackOutputs): Promise<ProjectSummary[]> {
@@ -39,6 +41,7 @@ export async function listProjects(out: StackOutputs): Promise<ProjectSummary[]>
         lastDeployedAt: manifest.deployments.at(-1)?.createdAt,
         bytes: size.bytes,
         files: size.objects,
+        source: manifest.source ? { repo: manifest.source.repo, branch: manifest.source.branch } : undefined,
       };
     }),
   );

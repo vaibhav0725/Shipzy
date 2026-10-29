@@ -4,12 +4,14 @@ import {
   deletePrefix,
   deleteRoute,
   listDeploymentIds,
+  listGithubConnections,
   listManifestProjects,
   listRoutes,
   readManifest,
 } from '@deployer/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { confirmByTyping } from '../lib/prompt.js';
+import { removeRepoWebhook } from '../lib/webhooks.js';
 
 export interface DeleteOptions {
   project: string;
@@ -38,6 +40,7 @@ export async function deleteProject(opts: DeleteOptions, global: GlobalOptions):
   console.log(`Project "${project}": ${folders.length} deployment folder${folders.length === 1 ? '' : 's'} in S3.`);
   for (const r of routes) console.log(`  live on ${r.host}: this site will start returning 404`);
   if (routes.length === 0) console.log('  not live anywhere, so no site is affected');
+  if (manifest.source) console.log(`  deploys from ${manifest.source.repo}@${manifest.source.branch}: its GitHub connection will be removed`);
 
   if (opts.dryRun) {
     console.log('\nDry run: nothing was deleted.');
@@ -51,6 +54,19 @@ export async function deleteProject(opts: DeleteOptions, global: GlobalOptions):
   // Routes first so nothing serves a half-deleted project; history last so an interrupted run can be repeated.
   for (const r of routes) await deleteRoute(out.kvsArn, r.host);
   const objects = await deletePrefix(out.bucket, `${project}/`);
+  if (out.buildsBucket) await deletePrefix(out.buildsBucket, `src/${project}/`);
+
+  // The history file holds the GitHub connection, so deal with the webhook before it goes.
+  if (manifest.source) {
+    const sharedWith = (await listGithubConnections(out.bucket)).filter(
+      (c) => c.project !== project && c.source.repo.toLowerCase() === manifest.source!.repo.toLowerCase(),
+    ).length;
+    console.log(
+      sharedWith > 0
+        ? `Webhook kept: ${sharedWith} other project(s) deploy from ${manifest.source.repo}.`
+        : await removeRepoWebhook(out, manifest.source.repo),
+    );
+  }
   await deleteManifest(out.bucket, project);
   console.log(`Deleted "${project}" (${objects} files, ${routes.length} route${routes.length === 1 ? '' : 's'}).`);
 }

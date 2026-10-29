@@ -2,9 +2,10 @@ import {
   DeleteStackCommand,
   waitUntilStackDeleteComplete,
 } from '@aws-sdk/client-cloudformation';
-import { emptyBucket } from '@deployer/core';
-import { cloudFormation, findStack, GlobalOptions, readOutputs } from '../lib/aws.js';
+import { emptyBucket, listGithubConnections } from '@deployer/core';
+import { cloudFormation, errorMessage, findStack, GlobalOptions, readOutputs } from '../lib/aws.js';
 import { confirmByTyping } from '../lib/prompt.js';
+import { removeRepoWebhook } from '../lib/webhooks.js';
 
 export async function destroy(opts: { yes?: boolean }, global: GlobalOptions): Promise<void> {
   const stack = await findStack(global.stackName);
@@ -21,9 +22,22 @@ export async function destroy(opts: { yes?: boolean }, global: GlobalOptions): P
     return;
   }
 
-  const { bucket } = readOutputs(stack);
-  console.log(`Emptying ${bucket}...`);
-  await emptyBucket(bucket);
+  const out = readOutputs(stack);
+
+  // Once the stack is gone its webhook URL is dead, so take the webhooks off the repositories first.
+  try {
+    const repos = new Set((await listGithubConnections(out.bucket)).map((c) => c.source.repo));
+    for (const repo of repos) console.log(await removeRepoWebhook(out, repo));
+  } catch (err) {
+    console.warn(`Could not check for GitHub webhooks (${errorMessage(err)}); remove any by hand in your repositories.`);
+  }
+
+  // CloudFormation cannot delete a bucket that still has objects in it.
+  for (const bucket of [out.bucket, out.buildsBucket]) {
+    if (!bucket) continue;
+    console.log(`Emptying ${bucket}...`);
+    await emptyBucket(bucket);
+  }
 
   console.log('Deleting stack (CloudFront takes a few minutes)...');
   const cfn = cloudFormation();

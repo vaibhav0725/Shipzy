@@ -1,5 +1,6 @@
 import { engineKeyOf, findStack, GlobalOptions, readOutputs, whoAmI } from '../lib/aws.js';
-import { formatBytes } from '../lib/format.js';
+import { duration, envOf, recentBuilds } from '../lib/builds.js';
+import { formatBytes, timeAgo } from '../lib/format.js';
 import { listProjects } from '../lib/projects.js';
 
 export async function status(opts: { json?: boolean }, global: GlobalOptions): Promise<void> {
@@ -8,6 +9,7 @@ export async function status(opts: { json?: boolean }, global: GlobalOptions): P
   if (!stack) throw new Error(`Stack "${global.stackName}" not found. Run \`deployer init\` first.`);
   const out = readOutputs(stack);
   const projects = await listProjects(out);
+  const [lastBuild] = out.buildProject ? await recentBuilds(out.buildProject, 1) : [];
 
   const summary = {
     account: me.account,
@@ -16,7 +18,15 @@ export async function status(opts: { json?: boolean }, global: GlobalOptions): P
     stack: { name: global.stackName, status: stack.StackStatus, updated: stack.LastUpdatedTime ?? stack.CreationTime },
     bucket: out.bucket,
     distribution: { id: out.distributionId, url: `https://${out.domain}` },
-    builds: { project: out.buildProject, engine: Boolean(engineKeyOf(stack)), webhookUrl: out.webhookUrl },
+    builds: {
+      project: out.buildProject,
+      engine: Boolean(engineKeyOf(stack)),
+      webhookUrl: out.webhookUrl,
+      last: lastBuild
+        ? { status: lastBuild.buildStatus, project: envOf(lastBuild, 'DEPLOY_PROJECT'), startedAt: lastBuild.startTime, took: duration(lastBuild) }
+        : undefined,
+    },
+    githubProjects: projects.filter((p) => p.source).length,
     projects: projects.length,
     deployments: projects.reduce((n, p) => n + p.versions, 0),
     liveSites: projects.reduce((n, p) => n + p.live.length, 0),
@@ -32,6 +42,13 @@ export async function status(opts: { json?: boolean }, global: GlobalOptions): P
     ['CloudFront', `${summary.distribution.id}  ${summary.distribution.url}`],
     ['Builds', summary.builds.engine ? `${out.buildProject} (engine installed)` : 'not set up: run `deployer init`'],
     ['Webhook', out.webhookUrl ?? '-'],
+    ['GitHub', `${summary.githubProjects} project(s) deploy on push`],
+    [
+      'Last build',
+      summary.builds.last
+        ? `${summary.builds.last.status}  ${summary.builds.last.project ?? '-'}  ${timeAgo(summary.builds.last.startedAt?.toISOString())}  (${summary.builds.last.took})`
+        : 'none yet',
+    ],
     ['Projects', `${summary.projects} (${summary.liveSites} live)`],
     ['Deployments', `${summary.deployments} stored, ${formatBytes(summary.bytes)}`],
   ];

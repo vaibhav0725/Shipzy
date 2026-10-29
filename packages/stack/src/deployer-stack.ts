@@ -37,6 +37,23 @@ export class DeployerStack extends cdk.Stack {
       keyValueStore: routes,
     });
 
+    // CDK derives these two physical names from the construct path, so they are identical in every stack and a
+    // second stack (`--stack-name`) in the same account would collide. A stack called "Deployer" keeps its
+    // original names, because changing them would replace the routing table and wipe its routes.
+    const isDefaultStack = new cdk.CfnCondition(this, 'IsDefaultStackName', {
+      expression: cdk.Fn.conditionEquals(cdk.Aws.STACK_NAME, 'Deployer'),
+    });
+    (routes.node.defaultChild as cloudfront.CfnKeyValueStore).addPropertyOverride('Name', {
+      'Fn::If': [isDefaultStack.logicalId, 'DeployerRoutesDF7DC447', { 'Fn::Sub': '${AWS::StackName}-routes' }],
+    });
+    (router.node.defaultChild as cloudfront.CfnFunction).addPropertyOverride('Name', {
+      'Fn::If': [
+        isDefaultStack.logicalId,
+        { 'Fn::Join': ['', [{ Ref: 'AWS::Region' }, 'DeployerRouterD968BC17']] },
+        { 'Fn::Sub': '${AWS::StackName}-router' },
+      ],
+    });
+
     const distribution = new cloudfront.Distribution(this, 'Cdn', {
       comment: 'deployer static sites',
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
@@ -48,6 +65,16 @@ export class DeployerStack extends cdk.Stack {
           { function: router, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST },
         ],
       },
+    });
+
+    // The distribution's Origin Access Control is account-global by name as well (see above).
+    const oac = this.node.findAll().find((c): c is cloudfront.CfnOriginAccessControl => c instanceof cloudfront.CfnOriginAccessControl);
+    oac?.addPropertyOverride('OriginAccessControlConfig.Name', {
+      'Fn::If': [
+        isDefaultStack.logicalId,
+        'DeployerCdnOrigin1S3OriginAccessControl657ACE9E',
+        { 'Fn::Sub': '${AWS::StackName}-oac' },
+      ],
     });
 
     // ---- Builds: remote builds, GitHub webhook, and the engine that promotes a finished build ----

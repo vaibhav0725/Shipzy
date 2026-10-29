@@ -118,6 +118,18 @@ export async function listManifestProjects(bucket: string): Promise<string[]> {
   return names;
 }
 
+export interface GithubConnection {
+  project: string;
+  source: GithubSource;
+}
+
+/** Every project that deploys from GitHub, with its repository and branch. */
+export async function listGithubConnections(bucket: string): Promise<GithubConnection[]> {
+  const projects = await listManifestProjects(bucket);
+  const manifests = await Promise.all(projects.map((name) => readManifest(bucket, name)));
+  return manifests.flatMap((m) => (m.source ? [{ project: m.project, source: m.source }] : []));
+}
+
 export async function deleteManifest(bucket: string, project: string): Promise<void> {
   await s3().send(new DeleteObjectCommand({ Bucket: bucket, Key: key(project) }));
 }

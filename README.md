@@ -29,8 +29,8 @@ npm run deployer -- list                                   # all projects: live 
 npm run deployer -- list --project demo                    # one project's deployments
 npm run deployer -- rollback --project demo                # back to the previous deployment
 npm run deployer -- prune --project demo --dry-run           # preview cleanup
-npm run deployer -- delete --project demo                  # remove one project (asks to confirm)
-npm run deployer -- destroy                                # remove everything
+npm run deployer -- delete --project demo                  # remove one project: sites, sources, webhook (asks to confirm)
+npm run deployer -- destroy                                # remove the whole stack: sites, webhooks, both buckets
 ```
 
 `list` and `status` accept `--json` for scripting.
@@ -85,6 +85,18 @@ builds in AWS: a CodeBuild project, a Builds bucket (uploaded sources expire aft
 two secrets, and three IAM roles for CodeBuild, the engine and the webhook. Each role is limited to this stack's
 own buckets, routing table, build project and secrets. `init` needs `CAPABILITY_IAM` and is safe to rerun.
 Logs are kept for 14 days. CodeBuild's free tier is 100 build-minutes a month.
+
+## Removing things
+- `delete -p <project>` removes the project's routes, deployment folders, uploaded sources and its history, and
+  takes the GitHub webhook off the repository (unless another project deploys from the same repo).
+- `destroy` takes the webhooks off every connected repository, empties both buckets, then deletes the stack.
+  Verified on a throwaway stack: nothing it created is left behind, including its secrets.
+
+## More than one stack
+`--stack-name` creates an independent stack in the same account, for example a staging copy. Names that CDK would
+otherwise derive from the construct path (the routing table, router function and origin access control) are made
+stack-specific, except for a stack called `Deployer`, which keeps its original names so existing installs are not
+replaced when they update.
 
 Until custom domains land, a project is served at the CloudFront domain, so the last project deployed
 to the default host wins; use `--host` to serve several projects.

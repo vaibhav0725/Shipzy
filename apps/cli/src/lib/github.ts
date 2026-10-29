@@ -107,3 +107,13 @@ export async function removeWebhook(token: string, repo: string, url: string): P
   await request(token, 'DELETE', `/repos/${repo}/hooks/${existing.id}`);
   return true;
 }
+
+/** A GitHub API failure in words a user can act on. */
+export function explainGithubError(err: unknown, repo: string): Error {
+  if (err instanceof GithubError) {
+    if (err.status === 401) return new Error('GitHub rejected the token (expired, revoked or mistyped).');
+    if (err.status === 404) return new Error(`Repository "${repo}" was not found, or the token cannot see it.`);
+    return new Error(`GitHub said ${err.status}: ${err.message}`);
+  }
+  return err instanceof Error ? err : new Error(String(err));
+}

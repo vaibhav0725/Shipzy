@@ -21,10 +21,11 @@ export async function list(opts: ListOptions, global: GlobalOptions): Promise<vo
       p.live.length ? p.live.map((l) => l.host).join(', ') : '- (not live)',
       p.live[0]?.deploymentId ?? '-',
       timeAgo(p.live[0]?.deployedAt ?? p.lastDeployedAt),
+      p.source ? `${p.source.repo}@${p.source.branch}` : '-',
       String(p.versions),
       formatBytes(p.bytes),
     ]);
-    console.log(table(['PROJECT', 'LIVE ON', 'LIVE DEPLOYMENT', 'DEPLOYED', 'VERSIONS', 'SIZE'], rows));
+    console.log(table(['PROJECT', 'LIVE ON', 'LIVE DEPLOYMENT', 'DEPLOYED', 'AUTO-DEPLOY FROM', 'VERSIONS', 'SIZE'], rows));
     console.log('\nDetails: deployer list -p <project>');
     return;
   }

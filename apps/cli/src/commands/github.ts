@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import {
   assertProjectName,
   DEFAULT_KEEP,
-  listManifestProjects,
+  listGithubConnections,
   newDeploymentId,
   readManifest,
   startBuild,
@@ -10,16 +10,16 @@ import {
 } from '@deployer/core';
 import { getOutputs, GlobalOptions, StackOutputs } from '../lib/aws.js';
 import {
+  explainGithubError,
   getRepo,
-  GithubError,
   headSha,
   pingWebhook,
   REPO_RE,
-  removeWebhook,
   upsertWebhook,
 } from '../lib/github.js';
 import { promptHidden } from '../lib/prompt.js';
 import { getSecret, putSecret } from '../lib/secrets.js';
+import { removeRepoWebhook } from '../lib/webhooks.js';
 import { watchBuild } from '../lib/watch.js';
 
 interface GithubStack {
@@ -35,15 +35,6 @@ function githubStack(out: StackOutputs): GithubStack {
     throw new Error('This stack has no GitHub support yet. Run `deployer init` to add it.');
   }
   return { buildProject, webhookUrl, webhookSecretArn, githubTokenSecretArn };
-}
-
-function explain(err: unknown, repo: string): Error {
-  if (err instanceof GithubError) {
-    if (err.status === 401) return new Error('GitHub rejected the token (expired, revoked or mistyped).');
-    if (err.status === 404) return new Error(`Repository "${repo}" was not found, or the token cannot see it.`);
-    return new Error(`GitHub said ${err.status}: ${err.message}`);
-  }
-  return err instanceof Error ? err : new Error(String(err));
 }
 
 async function readToken(): Promise<string> {
@@ -73,7 +64,7 @@ export async function connect(opts: ConnectOptions, global: GlobalOptions): Prom
   try {
     repo = await getRepo(token, opts.repo);
   } catch (err) {
-    throw explain(err, opts.repo);
+    throw explainGithubError(err, opts.repo);
   }
   const branch = opts.branch ?? repo.default_branch;
   if (!opts.reuseToken) await putSecret(stack.githubTokenSecretArn, token);
@@ -87,7 +78,7 @@ export async function connect(opts: ConnectOptions, global: GlobalOptions): Prom
     webhookNote = `webhook ${hook.created ? 'created' : 'updated'} (id ${hook.id})`;
   } catch (err) {
     webhookNote = 'webhook NOT registered';
-    console.warn(`\nCould not register the webhook (${explain(err, opts.repo).message}).`);
+    console.warn(`\nCould not register the webhook (${explainGithubError(err, opts.repo).message}).`);
     console.warn(
       'Add it yourself: repository > Settings > Webhooks > Add webhook\n' +
         `  Payload URL:  ${stack.webhookUrl}\n` +
@@ -130,7 +121,7 @@ export async function githubDeploy(opts: { project: string; detach?: boolean }, 
   try {
     sha = await headSha(token, source.repo, source.branch);
   } catch (err) {
-    throw explain(err, source.repo);
+    throw explainGithubError(err, source.repo);
   }
   console.log(`Building ${source.repo}@${sha.slice(0, 7)} (${source.branch})`);
 
@@ -154,22 +145,10 @@ export async function disconnect(opts: { project: string }, global: GlobalOption
   if (!source) throw new Error(`"${opts.project}" is not connected to GitHub.`);
 
   // One webhook serves every project on the same repository, so only remove it with the last one.
-  let sharedWith = 0;
-  for (const name of await listManifestProjects(out.bucket)) {
-    if (name === opts.project) continue;
-    if ((await readManifest(out.bucket, name)).source?.repo.toLowerCase() === source.repo.toLowerCase()) sharedWith++;
-  }
-
-  if (sharedWith > 0) {
-    console.log(`Webhook kept: ${sharedWith} other project(s) deploy from ${source.repo}.`);
-  } else {
-    try {
-      const removed = await removeWebhook(await getSecret(stack.githubTokenSecretArn), source.repo, stack.webhookUrl);
-      console.log(removed ? `Removed the webhook from ${source.repo}.` : `No webhook found on ${source.repo}.`);
-    } catch (err) {
-      console.warn(`Could not remove the webhook (${explain(err, source.repo).message}); delete it in the repository settings.`);
-    }
-  }
+  const sharedWith = (await listGithubConnections(out.bucket)).filter(
+    (c) => c.project !== opts.project && c.source.repo.toLowerCase() === source.repo.toLowerCase(),
+  ).length;
+  console.log(sharedWith > 0 ? `Webhook kept: ${sharedWith} other project(s) deploy from ${source.repo}.` : await removeRepoWebhook(out, source.repo));
 
   await updateManifest(out.bucket, opts.project, (m) => {
     delete m.source;
@@ -182,11 +161,7 @@ export async function rotateSecret(global: GlobalOptions): Promise<void> {
   const out = await getOutputs(global.stackName);
   const stack = githubStack(out);
 
-  const repos = new Set<string>();
-  for (const name of await listManifestProjects(out.bucket)) {
-    const { source } = await readManifest(out.bucket, name);
-    if (source) repos.add(source.repo);
-  }
+  const repos = new Set((await listGithubConnections(out.bucket)).map((c) => c.source.repo));
 
   const secret = randomBytes(30).toString('base64url');
   await putSecret(stack.webhookSecretArn, secret);
@@ -204,7 +179,7 @@ export async function rotateSecret(global: GlobalOptions): Promise<void> {
       console.log(`  ${repo}: webhook ${hook.created ? 'created' : 'updated'}`);
     } catch (err) {
       failed++;
-      console.warn(`  ${repo}: could not update the webhook (${explain(err, repo).message})`);
+      console.warn(`  ${repo}: could not update the webhook (${explainGithubError(err, repo).message})`);
     }
   }
   if (failed > 0) {
