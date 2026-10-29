@@ -16,6 +16,7 @@ import { list } from './commands/list.js';
 import { logs } from './commands/logs.js';
 import { previewsList, previewsRemove } from './commands/previews.js';
 import { pruneCommand } from './commands/prune.js';
+import { repoDeploy } from './commands/repo-deploy.js';
 import { rollback } from './commands/rollback.js';
 import { status } from './commands/status.js';
 import { DEFAULT_GRACE_MINUTES, DEFAULT_KEEP } from '@deployer/core';
@@ -54,8 +55,10 @@ program
 program.command('init').description('Create or update the AWS stack').action(() => init(globals()));
 
 program
-  .command('deploy <dir>')
-  .description('Build a React app and deploy it')
+  .command('deploy [dir]')
+  .description('Build a React app and deploy it (from a folder, or from a GitHub repository with --repo)')
+  .option('--repo <repository>', 'deploy a GitHub repository instead of a folder: owner/name or a github.com address (built in AWS; public repositories need no token)')
+  .option('--branch <name>', 'with --repo: the branch to deploy (default: the repository default branch)')
   .option('-p, --project <name>', 'project name (default: from package.json)')
   .option('--host <hostname>', 'host to serve on (default: the CloudFront domain)')
   .option('--skip-build', 'upload the existing dist/ or build/ folder as is')
@@ -64,7 +67,16 @@ program
   .option('--install-command <cmd>', 'replace the install step, e.g. "npm ci --legacy-peer-deps"')
   .option('--build-command <cmd>', 'replace the build step (default: <package manager> run build)')
   .option('--keep <n>', 'deployments to retain per project (live ones are always kept)', String(DEFAULT_KEEP))
-  .action((dir, opts) => deploy(dir, opts, globals()));
+  .action((dir: string | undefined, opts) => {
+    if (opts.repo) {
+      if (dir) throw new Error('Give either a folder or --repo, not both.');
+      if (opts.remote) throw new Error('--remote is implied by --repo (repositories are always built in AWS).');
+      return repoDeploy(opts.repo, opts, globals());
+    }
+    if (!dir) throw new Error('Give the folder to deploy, or --repo <repository>.');
+    if (opts.branch) throw new Error('--branch only applies with --repo.');
+    return deploy(dir, opts, globals());
+  });
 
 program
   .command('list')

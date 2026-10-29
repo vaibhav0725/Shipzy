@@ -6,7 +6,8 @@ import {
   SSMClient,
 } from '@aws-sdk/client-ssm';
 
-const client = () => new SSMClient({});
+let shared: SSMClient | undefined;
+const client = () => (shared ??= new SSMClient({}));
 
 /** Stores a value encrypted (SecureString, AWS-managed key: free). */
 export async function putParam(path: string, value: string): Promise<void> {

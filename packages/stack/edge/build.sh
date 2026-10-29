@@ -1,7 +1,7 @@
 # Runs inside CodeBuild for every deploy. Inputs arrive as environment variables:
 #   fixed by the stack:  SITES_BUCKET BUILDS_BUCKET ENGINE_FUNCTION GITHUB_TOKEN_SECRET DEFAULT_HOST
 #   per build:           DEPLOY_PROJECT DEPLOY_ID [DEPLOY_HOSTS] [DEPLOY_KEEP]   (hosts: comma-separated; default is decided by the engine)
-#                        SOURCE_TYPE (s3|github) SOURCE_S3_KEY | SOURCE_REPO SOURCE_REF
+#                        SOURCE_TYPE (s3|github) SOURCE_S3_KEY | SOURCE_REPO SOURCE_REF [SOURCE_PUBLIC=1: clone without a token]
 #                        [INSTALL_COMMAND] [BUILD_COMMAND]
 #                        [DEPLOY_PREVIEW_PR]   (set when this is a preview of a pull request)
 set -euo pipefail
@@ -38,12 +38,18 @@ case "$SOURCE_TYPE" in
     unzip -q /tmp/source.zip -d "$SRC"
     ;;
   github)
-    # The token goes in a request header, never in the URL, so it cannot leak into error output.
-    TOKEN="$(aws secretsmanager get-secret-value --secret-id "$GITHUB_TOKEN_SECRET" --query SecretString --output text)"
-    AUTH="Authorization: Basic $(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)"
     export GIT_TERMINAL_PROMPT=0   # fail instead of asking for a username
     git -C "$SRC" init -q
-    if ! git -C "$SRC" -c "http.extraHeader=$AUTH" fetch -q --depth 1 "https://github.com/${SOURCE_REPO:?}.git" "${SOURCE_REF:?}"; then
+    if [ "${SOURCE_PUBLIC:-}" = 1 ]; then
+      # A public repository needs no credentials (and a wrong stored token would make GitHub refuse it).
+      FETCH=(git -C "$SRC" fetch -q --depth 1 "https://github.com/${SOURCE_REPO:?}.git" "${SOURCE_REF:?}")
+    else
+      # The token goes in a request header, never in the URL, so it cannot leak into error output.
+      TOKEN="$(aws secretsmanager get-secret-value --secret-id "$GITHUB_TOKEN_SECRET" --query SecretString --output text)"
+      AUTH="Authorization: Basic $(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)"
+      FETCH=(git -C "$SRC" -c "http.extraHeader=$AUTH" fetch -q --depth 1 "https://github.com/${SOURCE_REPO:?}.git" "${SOURCE_REF:?}")
+    fi
+    if ! "${FETCH[@]}"; then
       echo "Could not fetch ${SOURCE_REPO} at ${SOURCE_REF:0:7}."
       echo "Check that the repository exists and that the stored GitHub token can read it."
       echo "(Store a new token with: deployer github connect -p <project> --repo ${SOURCE_REPO})"

@@ -67,9 +67,9 @@ export async function listDomainStacks(stackName: string): Promise<DomainStackIn
     token = page.NextToken;
   } while (token);
 
+  const stacks = await Promise.all(names.map(async (name) => ({ name, stack: await findStack(name) })));
   const infos: DomainStackInfo[] = [];
-  for (const name of names) {
-    const stack = await findStack(name);
+  for (const { name, stack } of stacks) {
     if (!stack) continue;
     const params = paramsOf(stack);
     const outputs = outputsOf(stack);
@@ -108,12 +108,18 @@ export async function checkDns(host: string, distributionDomain: string): Promis
   }
 }
 
+/** Every claimed domain with the project that owns it (one read of each history file, all at once). */
+export async function domainOwners(bucket: string): Promise<Map<string, string>> {
+  const projects = await listManifestProjects(bucket);
+  const manifests = await Promise.all(projects.map((p) => readManifest(bucket, p)));
+  const owners = new Map<string, string>();
+  manifests.forEach((m, i) => m.domains?.forEach((d) => owners.set(d, projects[i]!)));
+  return owners;
+}
+
 /** Which project, if any, has claimed this host as a domain. */
 export async function projectOfDomain(bucket: string, host: string): Promise<string | undefined> {
-  for (const project of await listManifestProjects(bucket)) {
-    if ((await readManifest(bucket, project)).domains?.includes(host)) return project;
-  }
-  return undefined;
+  return (await domainOwners(bucket)).get(host);
 }
 
 /**

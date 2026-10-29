@@ -4,7 +4,8 @@ import {
   SecretsManagerClient,
 } from '@aws-sdk/client-secrets-manager';
 
-const client = () => new SecretsManagerClient({});
+let shared: SecretsManagerClient | undefined;
+const client = () => (shared ??= new SecretsManagerClient({}));
 
 export async function getSecret(arn: string): Promise<string> {
   const res = await client().send(new GetSecretValueCommand({ SecretId: arn }));

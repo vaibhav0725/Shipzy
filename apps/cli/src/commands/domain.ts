@@ -21,6 +21,7 @@ import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { deployStack } from '../lib/cfn.js';
 import {
   checkDns,
+  domainOwners,
   domainStackName,
   listDomainStacks,
   projectOfDomain,
@@ -167,23 +168,27 @@ async function waitForDns(host: string, distribution: string, serving = false): 
 
 export async function domainList(opts: { project?: string; json?: boolean }, global: GlobalOptions): Promise<void> {
   const out = await getOutputs(global.stackName);
-  const stacks = await listDomainStacks(global.stackName);
-  const bases = await readPreviewBases(out.bucket);
-  const rows = [];
-  for (const s of stacks) {
-    const isBase = bases.includes(s.host.replace(/^\*\./, ''));
-    const project = isBase ? undefined : await projectOfDomain(out.bucket, s.host);
-    if (opts.project && project !== opts.project) continue;
-    const cert = s.certificateArn ? await describeCertificate(s.certificateArn).catch(() => undefined) : undefined;
-    rows.push({
-      host: s.host,
-      project: project ?? (isBase ? '(previews)' : '-'),
-      stack: s.status,
-      certificate: cert?.status ?? '-',
-      dns: s.distributionDomain ? await checkDns(s.host, s.distributionDomain) : 'pending',
-      distribution: s.distributionDomain,
-    });
-  }
+  const [stacks, bases, owners] = await Promise.all([listDomainStacks(global.stackName), readPreviewBases(out.bucket), domainOwners(out.bucket)]);
+  const all = await Promise.all(
+    stacks.map(async (s) => {
+      const isBase = bases.includes(s.host.replace(/^\*\./, ''));
+      const project = isBase ? undefined : owners.get(s.host);
+      if (opts.project && project !== opts.project) return undefined;
+      const [cert, dns] = await Promise.all([
+        s.certificateArn ? describeCertificate(s.certificateArn).catch(() => undefined) : undefined,
+        s.distributionDomain ? checkDns(s.host, s.distributionDomain) : 'pending',
+      ]);
+      return {
+        host: s.host,
+        project: project ?? (isBase ? '(previews)' : '-'),
+        stack: s.status,
+        certificate: cert?.status ?? '-',
+        dns,
+        distribution: s.distributionDomain,
+      };
+    }),
+  );
+  const rows = all.filter((r): r is NonNullable<typeof r> => r !== undefined);
   if (opts.json) return console.log(JSON.stringify(rows, null, 2));
   if (rows.length === 0) return console.log('No custom domains. Add one with: deployer domain add <host> -p <project>');
   console.log(table(['HOST', 'PROJECT', 'STACK', 'CERTIFICATE', 'DNS'], rows.map((r) => [r.host, r.project, r.stack, r.certificate, r.dns])));

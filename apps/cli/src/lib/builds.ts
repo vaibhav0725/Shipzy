@@ -6,7 +6,8 @@ import {
 } from '@aws-sdk/client-codebuild';
 import { CloudWatchLogsClient, GetLogEventsCommand } from '@aws-sdk/client-cloudwatch-logs';
 
-const codeBuild = () => new CodeBuildClient({});
+let sharedBuild: CodeBuildClient | undefined;
+const codeBuild = () => (sharedBuild ??= new CodeBuildClient({}));
 // Build tools colour their output even when it is not a terminal, and some (Vite 8's bundler) ignore NO_COLOR.
 // A terminal renders the codes nicely; a pipe or file would only get noise, so strip them there.
 const ANSI = /\x1b\[[0-9;?]*[ -/]*[@-~]/g;

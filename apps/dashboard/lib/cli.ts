@@ -34,8 +34,31 @@ export function childEnv(extra?: Record<string, string>): NodeJS.ProcessEnv {
 
 export class CliError extends Error {}
 
-const cache = new Map<string, { at: number; value: Promise<unknown> }>();
-export const clearCache = () => cache.clear();
+// Results are kept on globalThis because Next may load this module more than once (routes, instrumentation).
+interface Entry {
+  at: number;
+  value?: unknown;
+  refreshing?: Promise<unknown>;
+}
+const g = globalThis as unknown as { __deployerCache?: Map<string, Entry> };
+const cache = (g.__deployerCache ??= new Map<string, Entry>());
+
+/** After a change (a finished job), what was read before may be wrong: drop it and read the common pages again. */
+export function clearCache(): void {
+  cache.clear();
+  warm();
+}
+
+/** The reads every page starts with, fetched ahead of time so the first page opens from memory. */
+export function warm(): void {
+  for (const [args, ttl] of [
+    [['status', '--json'], 4000],
+    [['list', '--json'], 4000],
+    [['domain', 'ls', '--json'], 8000],
+  ] as const) {
+    runJson([...args], ttl).catch(() => undefined);
+  }
+}
 
 function run(args: string[]): Promise<string> {
   const { file, argv } = cliCommand(args);
@@ -54,14 +77,37 @@ function run(args: string[]): Promise<string> {
   });
 }
 
-/** Runs a read-only CLI command that prints JSON (`--json`). Results are cached briefly, so a page that asks
- *  for the same thing twice, or two browser tabs, do not each start an AWS round trip. */
+/** Past this age a result is not shown any more, even while a new one is being read. */
+const MAX_STALE_MS = 10 * 60_000;
+
+/**
+ * Runs a read-only CLI command that prints JSON (`--json`). Every read costs a few seconds of AWS round trips, so a
+ * result younger than `ttlMs` is returned as is, an older one is returned at once while a fresh read runs in the
+ * background (the page's next poll shows it), and only a first read has to wait.
+ */
 export function runJson<T>(args: string[], ttlMs = 4000): Promise<T> {
   const key = args.join('\0');
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < ttlMs) return hit.value as Promise<T>;
-  const value = run(args).then((text) => JSON.parse(text) as T);
-  cache.set(key, { at: Date.now(), value });
-  value.catch(() => cache.delete(key));
-  return value;
+  const entry = cache.get(key) ?? { at: 0 };
+  cache.set(key, entry);
+
+  const age = Date.now() - entry.at;
+  const refresh = (): Promise<unknown> =>
+    (entry.refreshing ??= run(args)
+      .then((text) => {
+        entry.value = JSON.parse(text);
+        entry.at = Date.now();
+        return entry.value;
+      })
+      .finally(() => {
+        entry.refreshing = undefined;
+      }));
+
+  if (entry.value !== undefined && age < ttlMs) return Promise.resolve(entry.value as T);
+  if (entry.value !== undefined && age < MAX_STALE_MS) {
+    refresh().catch(() => undefined);
+    return Promise.resolve(entry.value as T);
+  }
+  const fresh = refresh() as Promise<T>;
+  fresh.catch(() => cache.delete(key));
+  return fresh;
 }

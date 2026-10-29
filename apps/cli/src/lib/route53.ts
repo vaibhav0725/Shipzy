@@ -7,7 +7,8 @@ import {
 } from '@aws-sdk/client-route-53';
 
 // Route 53 is global; the CloudFront alias zone id below is the same everywhere.
-const client = () => new Route53Client({ region: 'us-east-1' });
+let shared: Route53Client | undefined;
+const client = () => (shared ??= new Route53Client({ region: 'us-east-1' }));
 export const CLOUDFRONT_ALIAS_ZONE = 'Z2FDTNDATAQYW2';
 
 export interface Zone {

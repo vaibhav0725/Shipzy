@@ -77,10 +77,39 @@ export async function planAction(body: Body): Promise<ActionPlan> {
       };
     }
 
+    case 'deploy-repo': {
+      // A one-time deploy of a pasted repository link. Public repositories need no token.
+      const project = v.project(body.project);
+      const parsed = v.repoInput(body.repo);
+      const branch = body.branch ? v.branch(body.branch) : parsed.branch;
+      const host = body.host ? v.host(body.host) : undefined;
+      await requireExplicitTarget(project, Boolean(host), v.flag(body.acceptSharedUrl));
+      return {
+        label: `Deploy ${parsed.repo} as ${project}`,
+        project,
+        steps: [
+          {
+            args: [
+              'deploy',
+              '--repo',
+              parsed.repo,
+              '-p',
+              project,
+              ...(branch ? ['--branch', branch] : []),
+              ...(host ? ['--host', host] : []),
+              ...withValue('--install-command', v.command(body.installCommand, 'The install command')),
+              ...withValue('--build-command', v.command(body.buildCommand, 'The build command')),
+            ],
+          },
+        ],
+      };
+    }
+
     case 'deploy-github': {
       const project = v.project(body.project);
-      const repo = v.repo(body.repo);
-      const branch = body.branch ? v.branch(body.branch) : undefined;
+      const parsed = v.repoInput(body.repo);
+      const repo = parsed.repo;
+      const branch = body.branch ? v.branch(body.branch) : parsed.branch;
       const host = body.host ? v.host(body.host) : undefined;
       const reuse = v.flag(body.reuseToken);
       const token = typeof body.token === 'string' ? body.token.trim() : '';

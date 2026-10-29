@@ -4,12 +4,13 @@ import { formatBytes, timeAgo } from '../lib/format.js';
 import { listProjects } from '../lib/projects.js';
 
 export async function status(opts: { json?: boolean }, global: GlobalOptions): Promise<void> {
-  const me = await whoAmI();
-  const stack = await findStack(global.stackName);
+  const [me, stack] = await Promise.all([whoAmI(), findStack(global.stackName)]);
   if (!stack) throw new Error(`Stack "${global.stackName}" not found. Run \`deployer init\` first.`);
   const out = readOutputs(stack);
-  const projects = await listProjects(out);
-  const [lastBuild] = out.buildProject ? await recentBuilds(out.buildProject, 1) : [];
+  const [projects, [lastBuild]] = await Promise.all([
+    listProjects(out),
+    out.buildProject ? recentBuilds(out.buildProject, 1) : Promise.resolve([]),
+  ]);
 
   const summary = {
     account: me.account,

@@ -37,7 +37,8 @@ export function configureEnv(opts: GlobalOptions): void {
     opts.region ?? process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? 'us-east-1';
 }
 
-export const cloudFormation = () => new CloudFormationClient({});
+let cfn: CloudFormationClient | undefined;
+export const cloudFormation = () => (cfn ??= new CloudFormationClient({}));
 
 export async function whoAmI(): Promise<{ account: string; arn: string }> {
   try {

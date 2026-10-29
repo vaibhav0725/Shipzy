@@ -9,6 +9,14 @@ import { api, Manifest, startAction } from '@/lib/client';
 type Source = 'folder' | 'github';
 const NAME_RE = /^[a-z0-9][a-z0-9-]{0,62}$/;
 
+/** Best-effort reading of a pasted link, for suggestions only (the server does the real check). */
+function peek(input: string): { name?: string; branch?: string } {
+  const m = /github\.com[/:]([^/\s]+)\/([^/\s#?]+?)(?:\.git)?(?:\/tree\/([^/\s#?]+))?(?:[/?#].*)?$/i.exec(input.trim()) ?? /^([\w.-]+)\/([\w.-]+?)(?:\.git)?$/.exec(input.trim());
+  if (!m) return {};
+  const name = m[2]!.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63);
+  return { name: name || undefined, branch: m[3] };
+}
+
 export default function NewDeployment() {
   const router = useRouter();
   const [source, setSource] = useState<Source>('folder');
@@ -20,6 +28,7 @@ export default function NewDeployment() {
   const [branch, setBranch] = useState('');
   const [token, setToken] = useState('');
   const [reuse, setReuse] = useState(false);
+  const [mode, setMode] = useState<'once' | 'auto'>('once');
   const [host, setHost] = useState('');
   const [install, setInstall] = useState('');
   const [build, setBuild] = useState('');
@@ -88,7 +97,9 @@ export default function NewDeployment() {
       const job =
         source === 'folder'
           ? await startAction({ action: 'deploy-folder', dir: dir.trim(), remote, ...common })
-          : await startAction({ action: 'deploy-github', repo: repo.trim(), branch: branch.trim() || undefined, token: reuse ? undefined : token, reuseToken: reuse, ...common });
+          : mode === 'once'
+            ? await startAction({ action: 'deploy-repo', repo: repo.trim(), branch: branch.trim() || undefined, ...common })
+            : await startAction({ action: 'deploy-github', repo: repo.trim(), branch: branch.trim() || undefined, token: reuse ? undefined : token, reuseToken: reuse, ...common });
       router.push(`/jobs/${job.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -139,26 +150,54 @@ export default function NewDeployment() {
           ) : (
             <>
               <label className="field">
-                <span>Repository</span>
-                <input type="text" value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="owner/name" spellCheck={false} required />
+                <span>Repository link</span>
+                <input
+                  type="text"
+                  value={repo}
+                  onChange={(e) => {
+                    setRepo(e.target.value);
+                    const p = peek(e.target.value);
+                    if (p.name && (!project || project === peek(repo).name)) setProject(p.name);
+                    if (p.branch) setBranch(p.branch);
+                  }}
+                  placeholder="https://github.com/owner/name  or  owner/name"
+                  spellCheck={false}
+                  required
+                />
               </label>
               <label className="field">
                 <span>Branch</span>
                 <input type="text" value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="the repository's default branch" spellCheck={false} />
               </label>
-              <label className="check">
-                <input type="checkbox" checked={reuse} onChange={(e) => setReuse(e.target.checked)} />
-                <span>Use the GitHub token already stored in my AWS account</span>
+              <label className="field">
+                <span>What should happen</span>
+                <select value={mode} onChange={(e) => setMode(e.target.value as 'once' | 'auto')}>
+                  <option value="once">Deploy it now (public repositories need no token)</option>
+                  <option value="auto">Deploy it now and on every push (connects GitHub)</option>
+                </select>
               </label>
-              {!reuse && (
-                <label className="field">
-                  <span>GitHub token</span>
-                  <input type="password" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" placeholder="github_pat_..." required />
-                  <small>
-                    Needs Contents: read and Webhooks: read and write on the repository. It is stored encrypted in your own AWS account
-                    and never shown again or written to the log.
-                  </small>
-                </label>
+              {mode === 'once' ? (
+                <p className="muted small">
+                  The build runs in your AWS account. Pushes do not redeploy; you can connect the repository later from the project&apos;s
+                  GitHub tab. A private repository needs a token to be stored first: choose the second option once.
+                </p>
+              ) : (
+                <>
+                  <label className="check">
+                    <input type="checkbox" checked={reuse} onChange={(e) => setReuse(e.target.checked)} />
+                    <span>Use the GitHub token already stored in my AWS account</span>
+                  </label>
+                  {!reuse && (
+                    <label className="field">
+                      <span>GitHub token</span>
+                      <input type="password" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" placeholder="github_pat_..." required />
+                      <small>
+                        Needs Contents: read and Webhooks: read and write on the repository. It is stored encrypted in your own AWS account
+                        and never shown again or written to the log.
+                      </small>
+                    </label>
+                  )}
+                </>
               )}
             </>
           )}
@@ -208,7 +247,7 @@ export default function NewDeployment() {
 
         <ErrorNotice message={error} />
         <button className="primary" disabled={busy || !NAME_RE.test(project) || (needsAccept && !accept)}>
-          {busy ? 'Starting...' : source === 'folder' ? 'Deploy' : 'Connect and deploy'}
+          {busy ? 'Starting...' : source === 'github' && mode === 'auto' ? 'Connect and deploy' : 'Deploy'}
         </button>
       </form>
 

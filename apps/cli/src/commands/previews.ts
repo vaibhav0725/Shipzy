@@ -15,8 +15,8 @@ export async function previewsList(opts: { project?: string; json?: boolean }, g
   const hosts = new Set(routes.map((r) => r.host));
 
   const previews = [];
-  for (const project of opts.project ? [opts.project] : names) {
-    const manifest = await readManifest(out.bucket, project);
+  const manifests = await Promise.all((opts.project ? [opts.project] : names).map(async (project) => ({ project, manifest: await readManifest(out.bucket, project) })));
+  for (const { project, manifest } of manifests) {
     for (const [pr, info] of Object.entries(manifest.previews ?? {})) {
       previews.push({
         project,

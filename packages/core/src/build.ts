@@ -1,7 +1,10 @@
 import { CodeBuildClient, StartBuildCommand } from '@aws-sdk/client-codebuild';
 import type { BuildEnvVar } from './env.js';
 
-export type BuildSource = { type: 's3'; key: string } | { type: 'github'; repo: string; sha: string };
+export type BuildSource =
+  | { type: 's3'; key: string }
+  // `public`: the repository can be read without a token, so the build does not send one
+  | { type: 'github'; repo: string; sha: string; public?: boolean };
 
 export interface BuildRequest {
   project: string;
@@ -38,6 +41,7 @@ export function buildEnvironment(req: BuildRequest): BuildEnvironmentVariable[] 
     ['SOURCE_S3_KEY', req.source.type === 's3' ? req.source.key : undefined],
     ['SOURCE_REPO', req.source.type === 'github' ? req.source.repo : undefined],
     ['SOURCE_REF', req.source.type === 'github' ? req.source.sha : undefined],
+    ['SOURCE_PUBLIC', req.source.type === 'github' && req.source.public ? '1' : undefined],
     ['INSTALL_COMMAND', req.installCommand],
     ['BUILD_COMMAND', req.buildCommand],
     ['DEPLOY_PREVIEW_PR', req.preview === undefined ? undefined : String(req.preview.pr)],

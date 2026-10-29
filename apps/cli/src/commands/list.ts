@@ -30,10 +30,10 @@ export async function list(opts: ListOptions, global: GlobalOptions): Promise<vo
     return;
   }
 
-  const manifest = await readManifest(out.bucket, opts.project);
+  const [manifest, routing] = await Promise.all([readManifest(out.bucket, opts.project), projectRoutes(out, opts.project)]);
   // What is live is whatever the routing table points at this project, not what the history file last recorded
   // (a host can be taken over by another project, or changed by hand).
-  const routes = (await projectRoutes(out, opts.project)).production;
+  const routes = routing.production;
   manifest.live = Object.fromEntries(routes.map((r) => [r.host, r.target.slice(opts.project!.length + 1)]));
   if (opts.json) return console.log(JSON.stringify(manifest, null, 2));
   if (manifest.deployments.length === 0) {

@@ -12,7 +12,7 @@ export class GithubError extends Error {
 }
 
 // node:https rather than fetch, so requests go through the same network settings as the AWS SDK calls.
-function request<T>(token: string, method: string, path: string, body?: unknown): Promise<T> {
+function request<T>(token: string | undefined, method: string, path: string, body?: unknown): Promise<T> {
   const payload = body === undefined ? undefined : JSON.stringify(body);
   return new Promise((resolve, reject) => {
     const req = https.request(
@@ -21,7 +21,7 @@ function request<T>(token: string, method: string, path: string, body?: unknown)
         path,
         method,
         headers: {
-          Authorization: `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
           Accept: 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28',
           'User-Agent': 'deployer-cli',
@@ -65,9 +65,9 @@ interface Hook {
   config?: { url?: string };
 }
 
-export const getRepo = (token: string, repo: string) => request<Repo>(token, 'GET', `/repos/${repo}`);
+export const getRepo = (token: string | undefined, repo: string) => request<Repo>(token, 'GET', `/repos/${repo}`);
 
-export async function headSha(token: string, repo: string, branch: string): Promise<string> {
+export async function headSha(token: string | undefined, repo: string, branch: string): Promise<string> {
   const commit = await request<{ sha: string }>(token, 'GET', `/repos/${repo}/commits/${encodeURIComponent(branch)}`);
   return commit.sha;
 }
@@ -119,6 +119,9 @@ export function explainGithubError(err: unknown, repo: string): Error {
   if (err instanceof GithubError) {
     if (err.status === 401) return new Error('GitHub rejected the token (expired, revoked or mistyped).');
     if (err.status === 404) return new Error(`Repository "${repo}" was not found, or the token cannot see it.`);
+    if (err.status === 403 && /rate limit/i.test(err.message)) {
+      return new Error('GitHub is limiting requests without a token (60 an hour). Wait a while, or connect a token: deployer github connect.');
+    }
     return new Error(`GitHub said ${err.status}: ${err.message}`);
   }
   return err instanceof Error ? err : new Error(String(err));
@@ -152,4 +155,28 @@ export async function upsertComment(token: string, repo: string, pr: number, mar
     return existing.id;
   }
   return (await request<Comment>(token, 'POST', `/repos/${repo}/issues/${pr}/comments`, { body: text })).id;
+}
+
+/**
+ * Reads a repository from what people paste: "owner/name", a GitHub web address (optionally ending in .git or
+ * /tree/<branch>), or an SSH address. Anything that is not GitHub is refused.
+ */
+export function parseRepoInput(input: string): { repo: string; branch?: string } {
+  const text = input.trim();
+  const ssh = /^git@github\.com:([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/i.exec(text);
+  if (ssh) return { repo: `${ssh[1]}/${ssh[2]}` };
+  if (REPO_RE.test(text) && !text.startsWith('http')) return { repo: text.replace(/\.git$/i, '') };
+
+  let url: URL;
+  try {
+    url = new URL(/^[a-z]+:\/\//i.test(text) ? text : `https://${text}`);
+  } catch {
+    throw new Error(`"${input}" is not a GitHub repository; use owner/name or a github.com address.`);
+  }
+  if (!/^(www\.)?github\.com$/i.test(url.hostname)) throw new Error(`"${input}" is not on github.com; only GitHub repositories are supported.`);
+  const [owner, name, kind, branch] = url.pathname.split('/').filter(Boolean);
+  if (!owner || !name) throw new Error(`"${input}" does not name a repository (expected github.com/owner/name).`);
+  const repo = `${owner}/${name.replace(/\.git$/i, '')}`;
+  if (!REPO_RE.test(repo)) throw new Error(`"${input}" is not a valid repository address.`);
+  return { repo, branch: kind === 'tree' && branch ? decodeURIComponent(branch) : undefined };
 }

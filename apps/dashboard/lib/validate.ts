@@ -29,6 +29,24 @@ export const repo = (v: unknown): string => {
   return s;
 };
 
+/** What people paste: "owner/name", a github.com address (optionally .git or /tree/<branch>), or an SSH address. */
+export const repoInput = (v: unknown): { repo: string; branch?: string } => {
+  const text = str(v, 'The repository');
+  const ssh = /^git@github\.com:([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/i.exec(text);
+  if (ssh) return { repo: repo(`${ssh[1]}/${ssh[2]}`) };
+  if (REPO_RE.test(text)) return { repo: repo(text.replace(/\.git$/i, '')) };
+  let url: URL;
+  try {
+    url = new URL(/^[a-z]+:\/\//i.test(text) ? text : `https://${text}`);
+  } catch {
+    throw new InputError(`"${text}" is not a GitHub repository; use owner/name or a github.com address.`);
+  }
+  if (!/^(www\.)?github\.com$/i.test(url.hostname)) throw new InputError('Only GitHub repositories are supported.');
+  const [owner, name, kind, ref] = url.pathname.split('/').filter(Boolean);
+  if (!owner || !name) throw new InputError('That address does not name a repository (expected github.com/owner/name).');
+  return { repo: repo(`${owner}/${name.replace(/\.git$/i, '')}`), branch: kind === 'tree' && ref ? branch(decodeURIComponent(ref)) : undefined };
+};
+
 export const branch = (v: unknown): string => {
   const s = str(v, 'The branch');
   if (!BRANCH_RE.test(s) || s.includes('..')) throw new InputError(`"${s}" is not a valid branch name.`);

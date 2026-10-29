@@ -9,7 +9,8 @@ import {
 } from '@aws-sdk/client-acm';
 
 // CloudFront only accepts certificates from us-east-1, whatever region the stack lives in.
-const client = () => new ACMClient({ region: 'us-east-1' });
+let shared: ACMClient | undefined;
+const client = () => (shared ??= new ACMClient({ region: 'us-east-1' }));
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export interface ValidationRecord {

@@ -10,6 +10,9 @@ import {
   PutKeyCommand,
 } from '@aws-sdk/client-cloudfront-keyvaluestore';
 
+let kvsClient: CloudFrontKeyValueStoreClient | undefined;
+const kvs = () => (kvsClient ??= new CloudFrontKeyValueStoreClient({}));
+
 // Every write must quote the store's current ETag, and any other write in between invalidates it
 // (reported as a ValidationException "Pre-Condition failed"). With concurrent deploys that is
 // routine, so re-read the ETag and try again.
@@ -25,7 +28,7 @@ async function writeWithEtag(
   write: (client: CloudFrontKeyValueStoreClient, etag: string) => Promise<unknown>,
   attempts = 15,
 ): Promise<void> {
-  const client = new CloudFrontKeyValueStoreClient({});
+  const client = kvs();
   for (let attempt = 1; ; attempt++) {
     const store = await client.send(new DescribeKeyValueStoreCommand({ KvsARN: kvsArn }));
     try {
@@ -50,7 +53,7 @@ export async function setRoute(kvsArn: string, host: string, target: string): Pr
 
 export async function getRoute(kvsArn: string, host: string): Promise<string | undefined> {
   try {
-    const res = await new CloudFrontKeyValueStoreClient({}).send(
+    const res = await kvs().send(
       new GetKeyCommand({ KvsARN: kvsArn, Key: `host:${host.toLowerCase()}` }),
     );
     return res.Value;
@@ -67,7 +70,7 @@ export interface Route {
 }
 
 export async function listRoutes(kvsArn: string): Promise<Route[]> {
-  const client = new CloudFrontKeyValueStoreClient({});
+  const client = kvs();
   const routes: Route[] = [];
   let token: string | undefined;
   do {
