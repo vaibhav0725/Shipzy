@@ -1,7 +1,8 @@
-import { StackOutputs } from './aws.js';
+import { idTimestamp } from './ids.js';
 import { listRouteTargets } from './kvs.js';
-import { readManifest, routeTarget, writeManifest } from './manifest.js';
-import { deletePrefix, listDeploymentIds } from './upload.js';
+import { readManifest, routeTarget, updateManifest } from './manifest.js';
+import { deletePrefix, listDeploymentIds } from './objects.js';
+import { SiteRefs } from './types.js';
 
 export const DEFAULT_KEEP = 10;
 export const DEFAULT_GRACE_MINUTES = 60;
@@ -19,15 +20,7 @@ export interface PruneResult {
   orphans: string[];
 }
 
-// Ids look like d-20261028T212416-f8ca7f; the timestamp is UTC.
-function idTimestamp(id: string): number | undefined {
-  const m = /^d-(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})-[0-9a-f]+$/.exec(id);
-  if (!m) return undefined;
-  const [y, mo, d, h, mi, s] = m.slice(1).map(Number) as [number, number, number, number, number, number];
-  return Date.UTC(y, mo - 1, d, h, mi, s);
-}
-
-export async function prune(out: StackOutputs, project: string, opts: PruneOptions): Promise<PruneResult> {
+export async function prune(out: SiteRefs, project: string, opts: PruneOptions): Promise<PruneResult> {
   if (!Number.isInteger(opts.keep) || opts.keep < 1) throw new Error('--keep must be a whole number >= 1.');
 
   const manifest = await readManifest(out.bucket, project);
@@ -52,8 +45,10 @@ export async function prune(out: StackOutputs, project: string, opts: PruneOptio
   // Drop records first: a leftover object is harmless (the next sweep catches it),
   // but a record without objects would make a rollback serve nothing.
   if (expired.length > 0) {
-    manifest.deployments = manifest.deployments.filter((d) => !expired.includes(d.id));
-    await writeManifest(out.bucket, manifest);
+    // Remove only the ids decided above, so a deployment recorded meanwhile by another build survives.
+    await updateManifest(out.bucket, project, (m) => {
+      m.deployments = m.deployments.filter((d) => !expired.includes(d.id));
+    });
   }
   for (const id of [...expired, ...orphans]) {
     await deletePrefix(out.bucket, `${routeTarget(project, id)}/`);

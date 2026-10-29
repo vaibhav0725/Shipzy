@@ -1,6 +1,5 @@
+import { assertProjectName, prune } from '@deployer/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
-import { assertProjectName } from '../lib/manifest.js';
-import { prune } from '../lib/prune.js';
 
 export interface PruneCommandOptions {
   project: string;

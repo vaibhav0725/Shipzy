@@ -1,6 +1,6 @@
+import { readManifest } from '@deployer/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { formatBytes, table, timeAgo } from '../lib/format.js';
-import { readManifest } from '../lib/manifest.js';
 import { listProjects } from '../lib/projects.js';
 
 export interface ListOptions {

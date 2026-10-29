@@ -9,18 +9,41 @@ import {
   PutKeyCommand,
 } from '@aws-sdk/client-cloudfront-keyvaluestore';
 
+// Every write must quote the store's current ETag, and any other write in between invalidates it
+// (reported as a ValidationException "Pre-Condition failed"). With concurrent deploys that is
+// routine, so re-read the ETag and try again.
+function isEtagConflict(err: unknown): boolean {
+  const e = err as { name?: string; message?: string };
+  return e.name === 'ValidationException' && /pre-?condition/i.test(e.message ?? '');
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function writeWithEtag(
+  kvsArn: string,
+  write: (client: CloudFrontKeyValueStoreClient, etag: string) => Promise<unknown>,
+  attempts = 15,
+): Promise<void> {
+  const client = new CloudFrontKeyValueStoreClient({});
+  for (let attempt = 1; ; attempt++) {
+    const store = await client.send(new DescribeKeyValueStoreCommand({ KvsARN: kvsArn }));
+    try {
+      await write(client, store.ETag!);
+      return;
+    } catch (err) {
+      if (!isEtagConflict(err) || attempt >= attempts) throw err;
+      await sleep(30 * attempt + Math.random() * 120);
+    }
+  }
+}
+
 // Points a host at a deployment prefix; the edge router reads this on every request,
 // so promote and rollback take effect without touching the distribution.
 export async function setRoute(kvsArn: string, host: string, target: string): Promise<void> {
-  const client = new CloudFrontKeyValueStoreClient({});
-  const store = await client.send(new DescribeKeyValueStoreCommand({ KvsARN: kvsArn }));
-  await client.send(
-    new PutKeyCommand({
-      KvsARN: kvsArn,
-      Key: `host:${host.toLowerCase()}`,
-      Value: target,
-      IfMatch: store.ETag,
-    }),
+  await writeWithEtag(kvsArn, (client, etag) =>
+    client.send(
+      new PutKeyCommand({ KvsARN: kvsArn, Key: `host:${host.toLowerCase()}`, Value: target, IfMatch: etag }),
+    ),
   );
 }
 
@@ -64,9 +87,7 @@ export async function listRouteTargets(kvsArn: string): Promise<Set<string>> {
 }
 
 export async function deleteRoute(kvsArn: string, host: string): Promise<void> {
-  const client = new CloudFrontKeyValueStoreClient({});
-  const store = await client.send(new DescribeKeyValueStoreCommand({ KvsARN: kvsArn }));
-  await client.send(
-    new DeleteKeyCommand({ KvsARN: kvsArn, Key: `host:${host.toLowerCase()}`, IfMatch: store.ETag }),
+  await writeWithEtag(kvsArn, (client, etag) =>
+    client.send(new DeleteKeyCommand({ KvsARN: kvsArn, Key: `host:${host.toLowerCase()}`, IfMatch: etag })),
   );
 }

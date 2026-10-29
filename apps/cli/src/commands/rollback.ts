@@ -1,6 +1,5 @@
+import { readManifest, routeTarget, setRoute, updateManifest } from '@deployer/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
-import { setRoute } from '../lib/kvs.js';
-import { readManifest, routeTarget, writeManifest } from '../lib/manifest.js';
 
 export interface RollbackOptions {
   project: string;
@@ -26,7 +25,9 @@ export async function rollback(opts: RollbackOptions, global: GlobalOptions): Pr
   }
 
   await setRoute(out.kvsArn, host, routeTarget(opts.project, target));
-  manifest.live[host] = target;
-  await writeManifest(out.bucket, manifest);
+  const liveId = target;
+  await updateManifest(out.bucket, opts.project, (m) => {
+    m.live[host] = liveId;
+  });
   console.log(`https://${host} now serves ${target}`);
 }

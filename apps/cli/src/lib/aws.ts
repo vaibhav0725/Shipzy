@@ -2,7 +2,6 @@ import {
   CloudFormationClient,
   DescribeStacksCommand,
 } from '@aws-sdk/client-cloudformation';
-import { S3Client } from '@aws-sdk/client-s3';
 import { GetCallerIdentityCommand, STSClient } from '@aws-sdk/client-sts';
 
 export interface GlobalOptions {
@@ -28,7 +27,6 @@ export function configureEnv(opts: GlobalOptions): void {
 }
 
 export const cloudFormation = () => new CloudFormationClient({});
-export const s3 = () => new S3Client({});
 
 export async function whoAmI(): Promise<{ account: string; arn: string }> {
   try {

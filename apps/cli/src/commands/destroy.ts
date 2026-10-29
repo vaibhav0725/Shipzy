@@ -2,9 +2,9 @@ import {
   DeleteStackCommand,
   waitUntilStackDeleteComplete,
 } from '@aws-sdk/client-cloudformation';
+import { emptyBucket } from '@deployer/core';
 import { cloudFormation, findStack, GlobalOptions, readOutputs } from '../lib/aws.js';
 import { confirmByTyping } from '../lib/prompt.js';
-import { emptyBucket } from '../lib/upload.js';
 
 export async function destroy(opts: { yes?: boolean }, global: GlobalOptions): Promise<void> {
   const stack = await findStack(global.stackName);

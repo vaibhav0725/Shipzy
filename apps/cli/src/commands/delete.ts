@@ -1,8 +1,14 @@
+import {
+  assertProjectName,
+  deleteManifest,
+  deletePrefix,
+  deleteRoute,
+  listDeploymentIds,
+  listRoutes,
+  readManifest,
+} from '@deployer/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
-import { deleteRoute, listRoutes } from '../lib/kvs.js';
-import { assertProjectName, deleteManifest, readManifest } from '../lib/manifest.js';
 import { confirmByTyping } from '../lib/prompt.js';
-import { deletePrefix, listDeploymentIds } from '../lib/upload.js';
 
 export interface DeleteOptions {
   project: string;

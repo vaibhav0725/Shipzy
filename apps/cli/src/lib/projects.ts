@@ -1,7 +1,5 @@
+import { listManifestProjects, listRoutes, prefixSize, readManifest } from '@deployer/core';
 import { StackOutputs } from './aws.js';
-import { listRoutes } from './kvs.js';
-import { listManifestProjects, readManifest } from './manifest.js';
-import { prefixSize } from './upload.js';
 
 export interface LiveHost {
   host: string;

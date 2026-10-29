@@ -11,7 +11,7 @@ import { list } from './commands/list.js';
 import { pruneCommand } from './commands/prune.js';
 import { rollback } from './commands/rollback.js';
 import { status } from './commands/status.js';
-import { DEFAULT_GRACE_MINUTES, DEFAULT_KEEP } from './lib/prune.js';
+import { DEFAULT_GRACE_MINUTES, DEFAULT_KEEP } from '@deployer/core';
 
 // Some networks advertise IPv6 but drop it, and Node's connection racing then stalls AWS
 // requests (notably the KeyValueStore endpoint). Try IPv4 first and connect to one address
