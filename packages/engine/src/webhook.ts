@@ -22,13 +22,17 @@ const reply = (statusCode: number, body: unknown) => ({
   body: JSON.stringify(body),
 });
 
-let cachedSecret: string | undefined;
+// Cached briefly so a rotated secret (`deployer github rotate-secret`) takes effect within minutes
+// without redeploying anything.
+const SECRET_TTL_MS = 5 * 60_000;
+let cached: { value: string; fetchedAt: number } | undefined;
 async function webhookSecret(): Promise<string> {
-  cachedSecret ??= (
-    await new SecretsManagerClient({}).send(new GetSecretValueCommand({ SecretId: env('WEBHOOK_SECRET_ARN') }))
-  ).SecretString;
-  if (!cachedSecret) throw new Error('Webhook secret is empty');
-  return cachedSecret;
+  if (cached && Date.now() - cached.fetchedAt < SECRET_TTL_MS) return cached.value;
+  const value = (await new SecretsManagerClient({}).send(new GetSecretValueCommand({ SecretId: env('WEBHOOK_SECRET_ARN') })))
+    .SecretString;
+  if (!value) throw new Error('Webhook secret is empty');
+  cached = { value, fetchedAt: Date.now() };
+  return value;
 }
 
 function validSignature(secret: string, rawBody: string, header: string | undefined): boolean {

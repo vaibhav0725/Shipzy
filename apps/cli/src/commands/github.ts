@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import {
   assertProjectName,
   DEFAULT_KEEP,
@@ -91,9 +92,10 @@ export async function connect(opts: ConnectOptions, global: GlobalOptions): Prom
       'Add it yourself: repository > Settings > Webhooks > Add webhook\n' +
         `  Payload URL:  ${stack.webhookUrl}\n` +
         '  Content type: application/json\n' +
-        `  Secret:       ${webhookSecret}\n` +
+        `  Secret:       aws secretsmanager get-secret-value --secret-id ${stack.webhookSecretArn} --query SecretString --output text\n` +
         '  Events:       Just the push event\n' +
-        'A token with "Webhooks: read and write" (fine-grained) or admin:repo_hook (classic) lets the CLI do this for you.',
+        'A token with "Webhooks: read and write" (fine-grained) or admin:repo_hook (classic) lets the CLI do this for you:\n' +
+        '  fix the token\'s permissions, then run `deployer github rotate-secret`.',
     );
   }
 
@@ -173,4 +175,43 @@ export async function disconnect(opts: { project: string }, global: GlobalOption
     delete m.source;
   });
   console.log(`Disconnected ${opts.project}. Its deployments are unchanged.`);
+}
+
+/** Replaces the webhook secret and re-registers the webhook on every connected repository. */
+export async function rotateSecret(global: GlobalOptions): Promise<void> {
+  const out = await getOutputs(global.stackName);
+  const stack = githubStack(out);
+
+  const repos = new Set<string>();
+  for (const name of await listManifestProjects(out.bucket)) {
+    const { source } = await readManifest(out.bucket, name);
+    if (source) repos.add(source.repo);
+  }
+
+  const secret = randomBytes(30).toString('base64url');
+  await putSecret(stack.webhookSecretArn, secret);
+  console.log('Stored a new webhook secret.');
+  if (repos.size === 0) {
+    console.log('No project is connected to GitHub, so there is no webhook to update.');
+    return;
+  }
+
+  const token = await getSecret(stack.githubTokenSecretArn);
+  let failed = 0;
+  for (const repo of repos) {
+    try {
+      const hook = await upsertWebhook(token, repo, stack.webhookUrl, secret);
+      console.log(`  ${repo}: webhook ${hook.created ? 'created' : 'updated'}`);
+    } catch (err) {
+      failed++;
+      console.warn(`  ${repo}: could not update the webhook (${explain(err, repo).message})`);
+    }
+  }
+  if (failed > 0) {
+    console.warn(
+      '\nFor those, set the new secret by hand in the repository webhook settings. Read it with:\n' +
+        `  aws secretsmanager get-secret-value --secret-id ${stack.webhookSecretArn} --query SecretString --output text`,
+    );
+  }
+  console.log('\nThe webhook picks up the new secret within 5 minutes; deliveries signed with the old one are rejected.');
 }

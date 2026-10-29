@@ -7,7 +7,7 @@ import { builds } from './commands/builds.js';
 import { deploy } from './commands/deploy.js';
 import { deleteProject } from './commands/delete.js';
 import { destroy } from './commands/destroy.js';
-import { connect, disconnect, githubDeploy } from './commands/github.js';
+import { connect, disconnect, githubDeploy, rotateSecret } from './commands/github.js';
 import { init } from './commands/init.js';
 import { list } from './commands/list.js';
 import { logs } from './commands/logs.js';
@@ -99,6 +99,11 @@ github
   .requiredOption('-p, --project <name>')
   .option('--detach', 'start the build and return without waiting')
   .action((opts) => githubDeploy(opts, globals()));
+
+github
+  .command('rotate-secret')
+  .description('Replace the webhook signing secret and update the webhook on every connected repository')
+  .action(() => rotateSecret(globals()));
 
 github
   .command('disconnect')
