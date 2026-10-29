@@ -1,0 +1,17 @@
+{
+  "name": "deployer",
+  "private": true,
+  "description": "Open-source, bring-your-own-AWS static site deployer (Vercel-style)",
+  "license": "Apache-2.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build -w packages/stack && npm run build -w apps/cli",
+    "deployer": "node apps/cli/dist/index.js"
+  }
+}
