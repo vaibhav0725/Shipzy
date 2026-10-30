@@ -1,8 +1,9 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import FolderPicker, { FolderListing } from '@/components/FolderPicker';
+import GithubConnect, { RepoRow } from '@/components/GithubConnect';
 import { ErrorNotice } from '@/components/bits';
 import { api, Manifest, startAction } from '@/lib/client';
 
@@ -28,6 +29,8 @@ export default function NewDeployment() {
   const [branch, setBranch] = useState('');
   const [token, setToken] = useState('');
   const [reuse, setReuse] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [picked, setPicked] = useState<RepoRow>();
   const [mode, setMode] = useState<'once' | 'auto'>('once');
   const [host, setHost] = useState('');
   const [install, setInstall] = useState('');
@@ -79,6 +82,21 @@ export default function NewDeployment() {
     };
   }, [project]);
 
+  const onSession = useCallback((connected: boolean) => setLoggedIn(connected), []);
+
+  function pickRepo(r: RepoRow) {
+    const previous = peek(repo).name;
+    setPicked(r);
+    setRepo(r.repo);
+    setBranch('');
+    const name = peek(r.repo).name;
+    if (name && (!project || project === previous)) setProject(name);
+    // Picking from your own list is almost always "deploy it and keep it deployed".
+    setMode('auto');
+  }
+
+  // With a GitHub login the token comes from that login, unless the stored one is chosen.
+  const useLogin = loggedIn && !reuse;
   const domains = existing?.domains ?? [];
   const needsAccept = !host.trim() && domains.length === 0;
 
@@ -99,7 +117,7 @@ export default function NewDeployment() {
           ? await startAction({ action: 'deploy-folder', dir: dir.trim(), remote, ...common })
           : mode === 'once'
             ? await startAction({ action: 'deploy-repo', repo: repo.trim(), branch: branch.trim() || undefined, ...common })
-            : await startAction({ action: 'deploy-github', repo: repo.trim(), branch: branch.trim() || undefined, token: reuse ? undefined : token, reuseToken: reuse, ...common });
+            : await startAction({ action: 'deploy-github', repo: repo.trim(), branch: branch.trim() || undefined, token: reuse || useLogin ? undefined : token, useLogin, reuseToken: reuse, ...common });
       router.push(`/jobs/${job.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -149,6 +167,7 @@ export default function NewDeployment() {
             </>
           ) : (
             <>
+              <GithubConnect selected={repo} onSession={onSession} onPick={pickRepo} />
               <label className="field">
                 <span>Repository link</span>
                 <input
@@ -156,6 +175,7 @@ export default function NewDeployment() {
                   value={repo}
                   onChange={(e) => {
                     setRepo(e.target.value);
+                    setPicked(undefined);
                     const p = peek(e.target.value);
                     if (p.name && (!project || project === peek(repo).name)) setProject(p.name);
                     if (p.branch) setBranch(p.branch);
@@ -178,6 +198,7 @@ export default function NewDeployment() {
               </label>
               {mode === 'once' ? (
                 <p className="muted small">
+                  {picked?.private && <strong>This repository is private, so deploying it once will fail without a token. Choose the second option. </strong>}
                   The build runs in your AWS account. Pushes do not redeploy; you can connect the repository later from the project&apos;s
                   GitHub tab. A private repository needs a token to be stored first: choose the second option once.
                 </p>
@@ -187,7 +208,19 @@ export default function NewDeployment() {
                     <input type="checkbox" checked={reuse} onChange={(e) => setReuse(e.target.checked)} />
                     <span>Use the GitHub token already stored in my AWS account</span>
                   </label>
-                  {!reuse && (
+                  {useLogin && (
+                    <p className="muted small">
+                      Using your GitHub login. The token is stored encrypted in your own AWS account so builds can fetch the code, and is
+                      never shown or written to the log.
+                    </p>
+                  )}
+                  {picked && !picked.admin && (
+                    <div className="notice warn">
+                      You are not an admin of {picked.repo}, so GitHub will not let the webhook be created: the first deploy works, but
+                      pushes will not redeploy until an admin adds it.
+                    </div>
+                  )}
+                  {!reuse && !useLogin && (
                     <label className="field">
                       <span>GitHub token</span>
                       <input type="password" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" placeholder="github_pat_..." required />

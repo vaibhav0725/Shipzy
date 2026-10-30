@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { runJson } from './cli';
+import { sessionToken } from './github';
 import type { Step } from './jobs';
 import * as v from './validate';
 import { InputError } from './validate';
@@ -112,7 +113,10 @@ export async function planAction(body: Body): Promise<ActionPlan> {
       const branch = body.branch ? v.branch(body.branch) : parsed.branch;
       const host = body.host ? v.host(body.host) : undefined;
       const reuse = v.flag(body.reuseToken);
-      const token = typeof body.token === 'string' ? body.token.trim() : '';
+      // Either the login made with "Connect GitHub" (held by this server, never sent by the browser) or a pasted token.
+      const useLogin = v.flag(body.useLogin);
+      const token = useLogin ? (sessionToken() ?? '') : typeof body.token === 'string' ? body.token.trim() : '';
+      if (useLogin && !token) throw new InputError('Your GitHub login has ended. Connect GitHub again.');
       if (!reuse && !token) throw new InputError('Enter a GitHub token, or choose the token already stored in your account.');
       if (token && (token.length > 600 || /\s/.test(token))) throw new InputError('That does not look like a GitHub token.');
       await requireExplicitTarget(project, Boolean(host), v.flag(body.acceptSharedUrl));

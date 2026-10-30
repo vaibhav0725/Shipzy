@@ -460,7 +460,7 @@ before `dashboard`). Press Ctrl-C in the terminal to stop it.
 |---|---|
 | Overview | Account, stack, shared URL, totals, last build. If the stack does not exist it tells you to run `deployer init` |
 | Projects | Every project: where it is live, age, auto-deploy source, versions, size |
-| New deployment | Deploy from **a folder on this computer** (type or browse to it; build here or in AWS) or from **a GitHub repository** (repository, branch, token or the stored token) |
+| New deployment | Deploy from **a folder on this computer** (type or browse to it; build here or in AWS) or from **a GitHub repository** (pick from your repositories after **Connect GitHub**, or paste a link; token from the login, pasted, or the stored one) |
 | Project: Deployments | History with live badges, "Serve this one" (rollback), preview and run cleanup, delete the project |
 | Project: Domains | Add (progress shown live), check and remove custom domains |
 | Project: Environment | Add or remove variables, import a pasted `.env`; values are never shown |
@@ -486,6 +486,37 @@ in AWS keeps running there).
 - Deploying without a hostname to a project that has no domains asks you to agree that it **replaces whatever is
   live at the shared CloudFront address**.
 - Cancelling a job stops the local process. If the build had already started in AWS, it finishes anyway.
+
+#### Connect GitHub (sign in instead of pasting a token)
+
+With a GitHub login set up, **New deployment → GitHub repository** shows a **Connect GitHub** button. It shows a short
+code, you approve it on github.com, and the dashboard then lists your repositories to pick from (private ones too).
+Connecting a repository for deploy-on-push needs no token to be typed.
+
+One-time setup (about two minutes, free):
+
+1. On github.com open **Settings → Developer settings → OAuth Apps → New OAuth App**.
+2. Name: anything (for example `Deployer`). Homepage URL and Authorization callback URL: `http://127.0.0.1`.
+3. Create it, then tick **Enable Device Flow** and save. Do **not** generate a client secret; it is not needed.
+4. Copy the **Client ID** (it is not a secret) and make it available to the dashboard, for example in `~/.zshrc`:
+   ```sh
+   export DEPLOYER_GITHUB_CLIENT_ID=<your client id>
+   ```
+   Open a new terminal and start `deployer dashboard` again.
+
+What it does with the login:
+- The token GitHub returns is kept **in the memory of the running dashboard only**: not written to disk, not sent to the
+  browser, gone when you stop the dashboard or press **Disconnect**.
+- When you connect a repository, the token is handed to the CLI through an environment variable and stored encrypted in
+  **your** AWS account (the same place as a pasted token), because the build and the webhook need it later.
+- It asks GitHub for the `repo` scope: read your repositories and manage their webhooks and pull request comments. That
+  is broader than a fine-grained token limited to one repository; if you prefer that, paste a token instead.
+- Repositories in an organization may need the organization's approval for the OAuth App (GitHub shows a request
+  button on the approval page). To revoke access later: github.com → Settings → Applications.
+- You need admin rights on a repository for its webhook to be created; otherwise the first deploy works but pushes will
+  not redeploy.
+
+Without the client ID the page falls back to pasting a token, as before.
 
 **Limits.** `init` and `destroy` stay terminal-only on purpose. The dashboard is a local tool: anyone who can use your
 computer's browser session and reach `127.0.0.1` while it runs has your AWS access through it, so stop it when you are

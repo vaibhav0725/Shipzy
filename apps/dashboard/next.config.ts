@@ -10,6 +10,8 @@ const config: NextConfig = {
   compress: false,
   poweredByHeader: false,
   reactStrictMode: true,
+  // Do not let `next dev` write an AGENTS.md into the project.
+  agentRules: false,
 };
 
 export default config;
