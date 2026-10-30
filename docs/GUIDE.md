@@ -202,6 +202,27 @@ are all inside it. It has been tested from a clean install. The package is marke
 package name has not been chosen; once it is, removing that flag and running `npm publish` makes
 `npm install -g <name>` work for anyone.
 
+#### Least-privilege access (recommended)
+
+An administrator key works but is far more than this tool needs. `docs/iam/` has a policy that allows only what
+`deployer` does, and a script that creates a user with it:
+
+```sh
+AWS_PROFILE=<your-admin-profile> bash docs/iam/create-limited-user.sh     # creates user "deployer-cli", writes profile "deployer-lp"
+AWS_PROFILE=deployer-lp deployer status
+```
+
+The key is written straight into your local AWS profile and never printed. What the policy allows, by name:
+
+- the CloudFormation stacks, S3 buckets, Lambda functions and IAM roles whose names start with `Deployer`;
+- CloudFront, CodeBuild, ACM, Route 53 records, and the `/deployer/` parameters and the stack's two secrets;
+- nothing else: not other buckets, not other IAM users or access keys, not other services.
+
+If you use a different stack name (`--stack-name Staging`), replace the `Deployer` prefix in the policy with it.
+The policy can create IAM roles named `Deployer*`; it cannot create users, access keys or attach anything other than the
+Lambda logging policy. A person holding it could still give such a role extra rights through an inline policy, so treat
+the key as sensitive and do not share it.
+
 ### 4.3 Create the infrastructure
 
 ```sh
