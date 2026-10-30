@@ -27,6 +27,7 @@ export default function GithubConnect(props: { selected: string; onSession: (con
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState('');
+  const [clientIdInput, setClientIdInput] = useState('');
   const repos = useApi<{ repos: RepoRow[] }>(session.data?.connected ? '/api/github/repos' : null);
   const { onSession } = props;
 
@@ -79,6 +80,20 @@ export default function GithubConnect(props: { selected: string; onSession: (con
     }
   }
 
+  async function saveId() {
+    setError(undefined);
+    setBusy(true);
+    try {
+      await api('/api/github/config', { method: 'POST', body: JSON.stringify({ clientId: clientIdInput }) });
+      setClientIdInput('');
+      await session.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function disconnect() {
     setError(undefined);
     try {
@@ -97,12 +112,36 @@ export default function GithubConnect(props: { selected: string; onSession: (con
 
   if (!session.data) return null;
 
-  // Not set up: the form falls back to pasting a token.
+  // Not set up yet: explain the one-time step here and take the client ID, so nothing is edited by hand.
   if (!session.data.configured) {
     return (
-      <p className="muted small">
-        One-click GitHub login is not set up on this computer. Paste a token below, or see &quot;Connect GitHub&quot; in the guide to turn it on.
-      </p>
+      <div className="notice">
+        <strong>Connect GitHub (one-time setup, about 2 minutes)</strong>
+        <ol style={{ margin: '8px 0', paddingLeft: 20 }}>
+          <li>
+            Open{' '}
+            <a href="https://github.com/settings/applications/new" target="_blank" rel="noreferrer">
+              github.com/settings/applications/new
+            </a>
+            .
+          </li>
+          <li>
+            Application name: <code>Deployer</code> (anything). Homepage URL and Authorization callback URL: <code>http://127.0.0.1</code>
+          </li>
+          <li>Click <em>Register application</em>, then tick <em>Enable Device Flow</em> and save. Do not create a client secret.</li>
+          <li>Paste the <em>Client ID</em> here:</li>
+        </ol>
+        <div className="row" style={{ flexWrap: 'nowrap' }}>
+          <input type="text" value={clientIdInput} onChange={(e) => setClientIdInput(e.target.value)} placeholder="Ov23li..." spellCheck={false} autoComplete="off" />
+          <button type="button" className="primary" onClick={saveId} disabled={busy || clientIdInput.trim() === ''}>
+            Save
+          </button>
+        </div>
+        <ErrorNotice message={error} />
+        <p className="muted small" style={{ marginBottom: 0 }}>
+          The client ID is not a secret. Prefer not to? Skip this and paste a token below instead.
+        </p>
+      </div>
     );
   }
 

@@ -493,16 +493,15 @@ With a GitHub login set up, **New deployment → GitHub repository** shows a **C
 code, you approve it on github.com, and the dashboard then lists your repositories to pick from (private ones too).
 Connecting a repository for deploy-on-push needs no token to be typed.
 
-One-time setup (about two minutes, free):
+One-time setup (about two minutes, free). Until it is done, the page shows these steps and a box for the result:
 
-1. On github.com open **Settings → Developer settings → OAuth Apps → New OAuth App**.
+1. On github.com open **Settings → Developer settings → OAuth Apps → New OAuth App**
+   (direct link: `github.com/settings/applications/new`).
 2. Name: anything (for example `Deployer`). Homepage URL and Authorization callback URL: `http://127.0.0.1`.
-3. Create it, then tick **Enable Device Flow** and save. Do **not** generate a client secret; it is not needed.
-4. Copy the **Client ID** (it is not a secret) and make it available to the dashboard, for example in `~/.zshrc`:
-   ```sh
-   export DEPLOYER_GITHUB_CLIENT_ID=<your client id>
-   ```
-   Open a new terminal and start `deployer dashboard` again.
+3. Register it, then tick **Enable Device Flow** and save. Do **not** generate a client secret; it is not needed.
+4. Copy the **Client ID** (it is not a secret) and paste it into the box on the page, then **Save**. It is remembered in
+   `~/.deployer/dashboard.json`, so this is done once. (Setting `DEPLOYER_GITHUB_CLIENT_ID` in the environment works too
+   and takes precedence.)
 
 What it does with the login:
 - The token GitHub returns is kept **in the memory of the running dashboard only**: not written to disk, not sent to the

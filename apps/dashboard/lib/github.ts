@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { InputError } from './validate';
 
 // "Connect GitHub" uses GitHub's device flow: the dashboard shows a short code, the person approves it on
@@ -33,7 +36,34 @@ interface State {
 const g = globalThis as unknown as { __deployerGithub?: State };
 const state: State = (g.__deployerGithub ??= { devices: new Map<string, Device>() });
 
-export const clientId = () => process.env.DEPLOYER_GITHUB_CLIENT_ID?.trim() || undefined;
+// The client ID comes from the environment, or from the dashboard's setup box (saved here so it is entered once).
+const CONFIG_FILE = path.join(os.homedir(), '.deployer', 'dashboard.json');
+const CLIENT_ID_RE = /^[A-Za-z0-9._-]{8,60}$/;
+
+function savedClientId(): string | undefined {
+  try {
+    const id = (JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')) as { githubClientId?: unknown }).githubClientId;
+    return typeof id === 'string' && CLIENT_ID_RE.test(id) ? id : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export const clientId = () => process.env.DEPLOYER_GITHUB_CLIENT_ID?.trim() || savedClientId();
+
+/** Remembers the OAuth App's client ID (public, not a secret) so the setup is a one-time step. */
+export function saveClientId(value: unknown): void {
+  const id = typeof value === 'string' ? value.trim() : '';
+  if (!CLIENT_ID_RE.test(id)) throw new InputError('That does not look like a client ID (letters and digits, from the OAuth App page on GitHub).');
+  fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true, mode: 0o700 });
+  let current: Record<string, unknown> = {};
+  try {
+    current = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')) as Record<string, unknown>;
+  } catch {
+    /* start a new file */
+  }
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify({ ...current, githubClientId: id }, null, 2), { mode: 0o600 });
+}
 
 export const sessionToken = (): string | undefined => state.session?.token;
 
