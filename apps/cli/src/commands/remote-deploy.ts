@@ -1,3 +1,4 @@
+import { ui } from '../lib/ui.js';
 import * as path from 'node:path';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { DEFAULT_KEEP, newDeploymentId, readManifest, resolveTargetHosts, s3, startBuild } from '@deployer/core';
@@ -38,7 +39,7 @@ export async function remoteDeploy(dirArg: string, opts: DeployOptions, global: 
 
   const id = newDeploymentId();
   const key = `src/${project}/${id}.zip`;
-  console.log(`Uploading source (${files} files, ${formatBytes(zip.length)})...`);
+  console.log(ui.step(`Uploading source (${files} files, ${formatBytes(zip.length)})...`));
   await s3().send(new PutObjectCommand({ Bucket: out.buildsBucket, Key: key, Body: zip, ContentType: 'application/zip' }));
 
   const buildId = await startBuild(out.buildProject, {

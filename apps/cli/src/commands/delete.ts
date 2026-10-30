@@ -1,3 +1,4 @@
+import { ui } from '../lib/ui.js';
 import {
   assertProjectName,
   deleteManifest,
@@ -44,9 +45,9 @@ export async function deleteProject(opts: DeleteOptions, global: GlobalOptions):
     throw new Error(`Project "${project}" not found. See \`deployer list\`.`);
   }
 
-  console.log(`Project "${project}": ${folders.length} deployment folder${folders.length === 1 ? '' : 's'} in S3.`);
+  console.log(`Project ${ui.name(`"${project}"`)}: ${folders.length} deployment folder${folders.length === 1 ? '' : 's'} in S3.`);
   for (const r of routes) {
-    console.log(isPreviewHost(r.host, bases) ? `  pull request preview ${r.host}: will be removed` : `  live on ${r.host}: this site will start returning 404`);
+    console.log(isPreviewHost(r.host, bases) ? `  pull request preview ${r.host}: will be removed` : ui.yellow(`  live on ${r.host}: this site will start returning 404`));
   }
   if (routes.length === 0) console.log('  not live anywhere, so no site is affected');
   const envCount = (manifest.env?.production.length ?? 0) + (manifest.env?.preview.length ?? 0);
@@ -56,7 +57,7 @@ export async function deleteProject(opts: DeleteOptions, global: GlobalOptions):
   if (manifest.source) console.log(`  deploys from ${manifest.source.repo}@${manifest.source.branch}: its GitHub connection will be removed`);
 
   if (opts.dryRun) {
-    console.log('\nDry run: nothing was deleted.');
+    console.log(ui.dim('\nDry run: nothing was deleted.'));
     return;
   }
   if (!opts.yes && !(await confirmByTyping(`\nThis permanently deletes "${project}" and all its deployments.`, project))) {
@@ -87,5 +88,5 @@ export async function deleteProject(opts: DeleteOptions, global: GlobalOptions):
     );
   }
   await deleteManifest(out.bucket, project);
-  console.log(`Deleted "${project}" (${objects} files, ${routes.length} route${routes.length === 1 ? '' : 's'}).`);
+  console.log(ui.ok(`Deleted ${ui.name(`"${project}"`)} (${objects} files, ${routes.length} route${routes.length === 1 ? '' : 's'}).`));
 }

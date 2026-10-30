@@ -552,6 +552,13 @@ done. A hosted or self-hosted dashboard for teams is a later step.
 
 ## 6. Command reference
 
+**Colours.** On a terminal the CLI uses colour to pick out what matters: green for success and healthy status, red for
+errors and failures, yellow for warnings and things in progress, bold for project and domain names, and underlined cyan
+for addresses you can open. Long waits (a CloudFront distribution takes minutes) show a spinner with a timer. Colour
+turns itself off when output is piped or redirected, in CI, and with `--json`, so scripts see plain text exactly as
+before. Set `NO_COLOR=1` to switch it off, or `FORCE_COLOR=1` to keep it on in a pipe. It uses the terminal's own 16
+colours, so it follows your light or dark theme.
+
 Global options, accepted by every command:
 
 | Option | Meaning |

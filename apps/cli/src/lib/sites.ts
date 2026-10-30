@@ -1,3 +1,4 @@
+import { ui } from './ui.js';
 import * as fs from 'node:fs';
 import { ListStacksCommand } from '@aws-sdk/client-cloudformation';
 import { assertProjectName, needsOwnSite, readManifest, updateManifest } from '@deployer/core';
@@ -24,7 +25,7 @@ export async function ensureProjectSite(out: StackOutputs, global: GlobalOptions
     throw new Error('This stack predates project addresses. Run `deployer init` to update it.');
   }
 
-  console.log(`Creating an address of its own for ${project} (CloudFront, about 5 minutes; only the first deploy of a project)...`);
+  console.log(ui.step(`Creating an address of its own for ${ui.name(project)} (CloudFront, about 5 minutes; only the first deploy of a project)...`));
   const { outputs } = await deployStack({
     name: siteStackName(global.stackName, project),
     templateBody: fs.readFileSync(assetPath('site-template.json'), 'utf8'),
@@ -40,7 +41,7 @@ export async function ensureProjectSite(out: StackOutputs, global: GlobalOptions
   await updateManifest(out.bucket, project, (m) => {
     m.siteHost = siteHost;
   });
-  console.log(`${project} will be served at https://${siteHost}`);
+  console.log(ui.ok(`${ui.name(project)} will be served at ${ui.url(`https://${siteHost}`)}`));
   return siteHost;
 }
 

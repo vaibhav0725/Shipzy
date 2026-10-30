@@ -1,3 +1,4 @@
+import { colorStatus, ui } from '../lib/ui.js';
 import { engineKeyOf, findStack, GlobalOptions, readOutputs, whoAmI } from '../lib/aws.js';
 import { duration, envOf, recentBuilds } from '../lib/builds.js';
 import { formatBytes, timeAgo } from '../lib/format.js';
@@ -44,16 +45,16 @@ export async function status(opts: { json?: boolean }, global: GlobalOptions): P
   const rows: [string, string][] = [
     ['Account', `${summary.account} (${summary.identity})`],
     ['Region', summary.region ?? '-'],
-    ['Stack', `${summary.stack.name}  ${summary.stack.status}`],
+    ['Stack', `${ui.name(summary.stack.name)}  ${colorStatus(summary.stack.status ?? "-")}`],
     ['Bucket', summary.bucket],
-    ['CloudFront', `${summary.distribution.id}  ${summary.distribution.url}`],
+    ['CloudFront', `${summary.distribution.id}  ${ui.url(summary.distribution.url)}`],
     ['Builds', summary.builds.engine ? `${out.buildProject} (engine installed)` : 'not set up: run `deployer init`'],
     ['Webhook', out.webhookUrl ?? '-'],
     ['GitHub', `${summary.githubProjects} project(s) deploy on push`],
     [
       'Last build',
       summary.builds.last
-        ? `${summary.builds.last.status}  ${summary.builds.last.project ?? '-'}  ${timeAgo(summary.builds.last.startedAt?.toISOString())}  (${summary.builds.last.took})`
+        ? `${colorStatus(summary.builds.last.status ?? '-')}  ${summary.builds.last.project ? ui.name(summary.builds.last.project) : '-'}  ${timeAgo(summary.builds.last.startedAt?.toISOString())}  (${summary.builds.last.took})`
         : 'none yet',
     ],
     ['Domains', `${summary.domains} custom${summary.previewDomains.length ? `; previews on ${summary.previewDomains.map((d) => `*.${d}`).join(', ')} (${summary.openPreviews} open)` : ''}`],
@@ -61,5 +62,5 @@ export async function status(opts: { json?: boolean }, global: GlobalOptions): P
     ['Projects', `${summary.projects} (${summary.liveSites} live)`],
     ['Deployments', `${summary.deployments} stored, ${formatBytes(summary.bytes)}`],
   ];
-  for (const [k, v] of rows) console.log(`${k.padEnd(12)}${v}`);
+  for (const [k, v] of rows) console.log(`${ui.dim(k.padEnd(12))}${v}`);
 }

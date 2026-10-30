@@ -1,3 +1,4 @@
+import { ui } from '../lib/ui.js';
 import { projectRoutes, readManifest } from '@deployer/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { formatBytes, table, timeAgo } from '../lib/format.js';
@@ -17,8 +18,8 @@ export async function list(opts: ListOptions, global: GlobalOptions): Promise<vo
     if (projects.length === 0) return console.log('No projects yet. Run `deployer deploy <dir>`.');
 
     const rows = projects.map((p) => [
-      p.name,
-      p.live.length ? p.live.map((l) => l.host).join(', ') : '- (not live)',
+      ui.name(p.name),
+      p.live.length ? p.live.map((l) => ui.url(l.host)).join(', ') : ui.dim('- (not live)'),
       p.live[0]?.deploymentId ?? '-',
       timeAgo(p.live[0]?.deployedAt ?? p.lastDeployedAt),
       p.source ? `${p.source.repo}@${p.source.branch}` : '-',
@@ -31,7 +32,7 @@ export async function list(opts: ListOptions, global: GlobalOptions): Promise<vo
       ].filter(Boolean).join(', ') || '-',
     ]);
     console.log(table(['PROJECT', 'LIVE ON', 'LIVE DEPLOYMENT', 'DEPLOYED', 'AUTO-DEPLOY FROM', 'VERSIONS', 'SIZE', 'NOTES'], rows));
-    console.log('\nDetails: deployer list -p <project>');
+    console.log(ui.dim('\nDetails: deployer list -p <project>'));
     return;
   }
 
@@ -51,6 +52,6 @@ export async function list(opts: ListOptions, global: GlobalOptions): Promise<vo
   }
   for (const d of [...manifest.deployments].reverse()) {
     const hosts = liveIds.get(d.id);
-    console.log(`${d.id}  ${d.createdAt}  ${String(d.files).padStart(4)} files${hosts ? `  <- live on ${hosts.join(', ')}` : ''}`);
+    console.log(`${ui.name(d.id)}  ${ui.dim(d.createdAt)}  ${String(d.files).padStart(4)} files${hosts ? `  ${ui.green(`<- live on ${hosts.join(', ')}`)}` : ''}`);
   }
 }

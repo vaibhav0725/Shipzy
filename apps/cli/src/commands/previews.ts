@@ -1,3 +1,4 @@
+import { ui } from '../lib/ui.js';
 import {
   assertProjectName,
   listManifestProjects,
@@ -42,7 +43,7 @@ export async function previewsList(opts: { project?: string; json?: boolean }, g
   console.log(
     table(
       ['PROJECT', 'PR', 'URL', 'COMMIT', 'UPDATED'],
-      previews.map((p) => [p.project, `#${p.pr}`, p.serving ? p.url : `${p.url} (not served)`, p.sha.slice(0, 7), timeAgo(p.updatedAt)]),
+      previews.map((p) => [ui.name(p.project), `#${p.pr}`, p.serving ? ui.url(p.url) : `${p.url} ${ui.yellow('(not served)')}`, p.sha.slice(0, 7), timeAgo(p.updatedAt)]),
     ),
   );
 }
@@ -53,5 +54,5 @@ export async function previewsRemove(prArg: string, opts: { project: string }, g
   if (!Number.isInteger(pr) || pr < 1) throw new Error(`"${prArg}" is not a pull request number.`);
   const out = await getOutputs(global.stackName);
   const removed = await removePreview(out, opts.project, pr);
-  console.log(removed ? `Removed the preview of ${opts.project} #${pr}.` : `${opts.project} has no preview for #${pr}.`);
+  console.log(removed ? ui.ok(`Removed the preview of ${opts.project} #${pr}.`) : `${opts.project} has no preview for #${pr}.`);
 }

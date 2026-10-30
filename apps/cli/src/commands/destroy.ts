@@ -1,3 +1,4 @@
+import { spinner, ui, uiErr } from '../lib/ui.js';
 import {
   DeleteStackCommand,
   waitUntilStackDeleteComplete,
@@ -33,21 +34,21 @@ export async function destroy(opts: { yes?: boolean }, global: GlobalOptions): P
   const failed: string[] = [];
   // Project addresses are the same kind of stack (a distribution in front of this stack's bucket and router).
   for (const s of await listSiteStacks(global.stackName)) {
-    console.log(`Removing the address of ${s.project}...`);
+    console.log(ui.step(`Removing the address of ${ui.name(s.project)}...`));
     try {
       await removeProjectSite(global, s.project);
     } catch (err) {
       failed.push(`the address of ${s.project}`);
-      console.warn(`  Could not remove it (${errorMessage(err)}).`);
+      console.warn(uiErr.yellow(`  Could not remove it (${errorMessage(err)}).`));
     }
   }
   for (const d of await listDomainStacks(global.stackName)) {
-    console.log(`Removing domain ${d.host}...`);
+    console.log(ui.step(`Removing domain ${ui.name(d.host)}...`));
     try {
       for (const line of await removeDomain(out, global, d.host)) console.log(`  ${line}`);
     } catch (err) {
       failed.push(d.host);
-      console.warn(`  Could not remove ${d.host} (${errorMessage(err)}).`);
+      console.warn(uiErr.yellow(`  Could not remove ${d.host} (${errorMessage(err)}).`));
     }
   }
   if (failed.length > 0) {
@@ -75,16 +76,21 @@ export async function destroy(opts: { yes?: boolean }, global: GlobalOptions): P
   // CloudFormation cannot delete a bucket that still has objects in it.
   for (const bucket of [out.bucket, out.buildsBucket]) {
     if (!bucket) continue;
-    console.log(`Emptying ${bucket}...`);
+    console.log(ui.step(`Emptying ${bucket}...`));
     // Resuming a destroy that stopped part-way: the bucket may already be deleted.
     await emptyBucket(bucket).catch((err) => {
       if ((err as { name?: string }).name !== 'NoSuchBucket') throw err;
     });
   }
 
-  console.log('Deleting stack (CloudFront takes a few minutes)...');
+  console.log(ui.step('Deleting stack (CloudFront takes a few minutes)...'));
   const cfn = cloudFormation();
   await cfn.send(new DeleteStackCommand({ StackName: global.stackName }));
-  await waitUntilStackDeleteComplete({ client: cfn, maxWaitTime: 1800 }, { StackName: global.stackName });
-  console.log('Destroyed.');
+  const stop = spinner(`Deleting ${global.stackName}`);
+  try {
+    await waitUntilStackDeleteComplete({ client: cfn, maxWaitTime: 1800 }, { StackName: global.stackName });
+  } finally {
+    stop();
+  }
+  console.log(ui.ok(ui.bold(ui.green('Destroyed.'))));
 }

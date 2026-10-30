@@ -1,3 +1,4 @@
+import { colorStatus, ui } from '../lib/ui.js';
 import * as fs from 'node:fs';
 import {
   assertProjectName,
@@ -36,7 +37,7 @@ import { isPreviewHost } from '@deployer/core';
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function printRecord(intro: string, rec: { type: string; name: string; value: string }): void {
-  console.log(`\n${intro}\n  Type   ${rec.type}\n  Name   ${rec.name}\n  Value  ${rec.value}\n`);
+  console.log(`\n${ui.bold(intro)}\n  ${ui.dim('Type ')}  ${rec.type}\n  ${ui.dim('Name ')}  ${ui.accent(rec.name)}\n  ${ui.dim('Value')}  ${ui.accent(rec.value)}\n`);
 }
 
 /** A failed destroy may already have deleted the stack's storage; recovery commands carry on without it. */
@@ -92,7 +93,7 @@ export async function domainAdd(hostArg: string, opts: DomainAddOptions, global:
 
   // 1. Certificate (CloudFront requires one in us-east-1)
   let certArn = await findCertificate(host);
-  console.log(certArn ? 'Reusing the existing certificate.' : 'Requesting a certificate...');
+  console.log(certArn ? ui.ok('Reusing the existing certificate.') : ui.step('Requesting a certificate...'));
   certArn ??= await requestCertificate(host);
   const cert = await waitForValidationRecord(certArn);
 
@@ -100,21 +101,21 @@ export async function domainAdd(hostArg: string, opts: DomainAddOptions, global:
     const rec: ValidationRecord = cert.validation!;
     if (zone) {
       await upsertCname(zone.id, rec.name, rec.value);
-      console.log('Added the certificate validation record to Route 53.');
+      console.log(ui.ok('Added the certificate validation record to Route 53.'));
     } else {
       printRecord('Add this DNS record to prove you own the domain (keep it: the certificate renews through it):', rec);
       if (opts.wait === false) return console.log('Run the same command again once the record is in place.');
     }
-    console.log('Waiting for the certificate (usually 1 to 10 minutes)...');
+    console.log(ui.step('Waiting for the certificate (usually 1 to 10 minutes)...'));
     const issued = await waitUntilIssued(certArn, 30 * 60_000, (secs) => {
-      if (secs > 0 && secs % 60 < 15) console.log(`  still waiting (${Math.round(secs / 60)} min)`);
+      if (secs > 0 && secs % 60 < 15) console.log(ui.dim(`  still waiting (${Math.round(secs / 60)} min)`));
     });
     if (!issued) return console.log('The certificate is not issued yet. Run the same command again to continue.');
   }
-  console.log('Certificate issued.');
+  console.log(ui.ok('Certificate issued.'));
 
   // 2. The distribution
-  console.log(`Creating the distribution for ${host} (about 5 minutes)...`);
+  console.log(ui.step(`Creating the distribution for ${ui.name(host)} (about 5 minutes)...`));
   const { outputs } = await deployStack({
     name: domainStackName(global.stackName, host),
     templateBody: fs.readFileSync(assetPath('domain-template.json'), 'utf8'),
@@ -133,7 +134,7 @@ export async function domainAdd(hostArg: string, opts: DomainAddOptions, global:
   // 3. Point the name at it
   if (zone) {
     await upsertAlias(zone.id, host, distribution);
-    console.log(`Created the DNS alias ${host} -> ${distribution} in Route 53.`);
+    console.log(ui.ok(`Created the DNS alias ${ui.name(host)} -> ${distribution} in Route 53.`));
   } else {
     printRecord(`Point ${host} at CloudFront with this DNS record:`, { type: 'CNAME', name: host, value: `${distribution}.` });
     if (isApex(host)) {
@@ -156,7 +157,7 @@ export async function domainAdd(hostArg: string, opts: DomainAddOptions, global:
     m.domains = [...new Set([...(m.domains ?? []), host])];
     if (id) m.live[host] = id;
   });
-  console.log(id ? `${host} now serves ${project} (${id}).` : `${host} is ready; deploy ${project} to put something on it.`);
+  console.log(id ? ui.ok(`${ui.name(host)} now serves ${ui.name(project!)} (${ui.dim(id)}).`) : ui.ok(`${ui.name(host)} is ready; deploy ${project} to put something on it.`));
 
   // 5. Wait for DNS to catch up
   if (opts.wait === false) return console.log(`Check later with: deployer domain verify ${host}`);
@@ -164,9 +165,9 @@ export async function domainAdd(hostArg: string, opts: DomainAddOptions, global:
 }
 
 async function waitForDns(host: string, distribution: string, serving = false): Promise<void> {
-  console.log('Waiting for DNS to reach the distribution...');
+  console.log(ui.step('Waiting for DNS to reach the distribution...'));
   for (let waited = 0; waited <= 600; waited += 15) {
-    if ((await checkDns(host, distribution)) === 'ok') return console.log(serving ? `\nLive: https://${host}` : `\nDNS for ${host} is in place.`);
+    if ((await checkDns(host, distribution)) === 'ok') return console.log(serving ? `\n${ui.ok(ui.bold(ui.green('Live:')))} ${ui.url(`https://${host}`)}` : `\n${ui.ok(`DNS for ${host} is in place.`)}`);
     await sleep(15_000);
   }
   console.log(`DNS has not reached the distribution yet (it can take a while). Check with: deployer domain verify ${host}`);
@@ -197,7 +198,7 @@ export async function domainList(opts: { project?: string; json?: boolean }, glo
   const rows = all.filter((r): r is NonNullable<typeof r> => r !== undefined);
   if (opts.json) return console.log(JSON.stringify(rows, null, 2));
   if (rows.length === 0) return console.log('No custom domains. Add one with: deployer domain add <host> -p <project>');
-  console.log(table(['HOST', 'PROJECT', 'STACK', 'CERTIFICATE', 'DNS'], rows.map((r) => [r.host, r.project, r.stack, r.certificate, r.dns])));
+  console.log(table(['HOST', 'PROJECT', 'STACK', 'CERTIFICATE', 'DNS'], rows.map((r) => [ui.url(r.host), ui.name(r.project), colorStatus(r.stack), colorStatus(r.certificate), colorStatus(r.dns)])));
 }
 
 export async function domainVerify(hostArg: string, global: GlobalOptions): Promise<void> {
@@ -209,10 +210,10 @@ export async function domainVerify(hostArg: string, global: GlobalOptions): Prom
   const cert = stack?.certificateArn ? await describeCertificate(stack.certificateArn) : undefined;
   const dns = stack?.distributionDomain ? await checkDns(host, stack.distributionDomain) : 'pending';
 
-  const mark = (ok: boolean) => (ok ? 'ok     ' : 'MISSING');
+  const mark = (ok: boolean) => (ok ? ui.green('ok     ') : ui.red('MISSING'));
   console.log(`${mark(Boolean(stack))} distribution stack ${stack ? `(${stack.status})` : '- run: deployer domain add ' + host + ' -p <project>'}`);
   console.log(`${mark(cert?.status === 'ISSUED')} certificate ${cert ? `(${cert.status})` : ''}`);
-  console.log(`${mark(Boolean(project))} ${isBase ? 'registered as a preview domain' : 'claimed by a project'} ${project ? `(${project})` : ''}`);
+  console.log(`${mark(Boolean(project))} ${isBase ? 'registered as a preview domain' : 'claimed by a project'} ${project && !isBase ? `(${project})` : ''}`);
   console.log(`${mark(dns === 'ok')} DNS ${dns === 'ok' ? 'reaches the distribution' : dns === 'wrong' ? 'resolves, but not to this distribution' : 'is not visible yet'}`);
   if (stack?.distributionDomain && dns !== 'ok') {
     console.log(`\nThe record to have: ${host} CNAME ${stack.distributionDomain} (or an alias to it).`);
@@ -220,7 +221,7 @@ export async function domainVerify(hostArg: string, global: GlobalOptions): Prom
   if (cert?.status === 'PENDING_VALIDATION' && cert.validation) {
     printRecord('The certificate is still waiting for this DNS record:', cert.validation);
   }
-  if (dns === 'ok' && cert?.status === 'ISSUED' && project) console.log(`\nhttps://${host} is ready.`);
+  if (dns === 'ok' && cert?.status === 'ISSUED' && project) console.log(`\n${ui.ok(`${ui.url(`https://${host}`)} is ready.`)}`);
 }
 
 export async function domainRemove(hostArg: string, opts: { yes?: boolean }, global: GlobalOptions): Promise<void> {

@@ -1,3 +1,4 @@
+import { ui } from '../lib/ui.js';
 import { projectRoutes, readManifest, routeTarget, setRoute, updateManifest } from '@deployer/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 
@@ -38,5 +39,5 @@ export async function rollback(opts: RollbackOptions, global: GlobalOptions): Pr
   await updateManifest(out.bucket, opts.project, (m) => {
     for (const host of hosts) m.live[host] = liveId;
   });
-  for (const host of hosts) console.log(`https://${host} now serves ${target}`);
+  for (const host of hosts) console.log(ui.ok(`${ui.url(`https://${host}`)} now serves ${ui.name(target)}`));
 }

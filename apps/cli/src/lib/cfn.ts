@@ -1,3 +1,4 @@
+import { spinner } from './ui.js';
 import {
   CloudFormationClient,
   CreateStackCommand,
@@ -64,18 +65,27 @@ export async function deployStack(opts: DeployStackOptions): Promise<{ stack: St
   let changed = true;
   if (!existing) {
     await cfn.send(new CreateStackCommand(common));
-    await waitOrExplain(cfn, opts.name, () =>
-      waitUntilStackCreateComplete({ client: cfn, maxWaitTime: MAX_WAIT_SECONDS }, { StackName: opts.name }),
-    );
+    const stop = spinner(opts.label ?? `Creating ${opts.name}`);
+    try {
+      await waitOrExplain(cfn, opts.name, () =>
+        waitUntilStackCreateComplete({ client: cfn, maxWaitTime: MAX_WAIT_SECONDS }, { StackName: opts.name }),
+      );
+    } finally {
+      stop();
+    }
   } else {
+    let stop = () => {};
     try {
       await cfn.send(new UpdateStackCommand(common));
+      stop = spinner(opts.label ?? `Updating ${opts.name}`);
       await waitOrExplain(cfn, opts.name, () =>
         waitUntilStackUpdateComplete({ client: cfn, maxWaitTime: MAX_WAIT_SECONDS }, { StackName: opts.name }),
       );
     } catch (err) {
       if (!errorMessage(err).includes('No updates are to be performed')) throw err;
       changed = false;
+    } finally {
+      stop();
     }
   }
 
@@ -86,7 +96,12 @@ export async function deployStack(opts: DeployStackOptions): Promise<{ stack: St
 export async function removeStack(name: string): Promise<void> {
   const cfn = cloudFormation();
   await cfn.send(new DeleteStackCommand({ StackName: name }));
-  await waitUntilStackDeleteComplete({ client: cfn, maxWaitTime: MAX_WAIT_SECONDS }, { StackName: name });
+  const stop = spinner(`Deleting ${name}`);
+  try {
+    await waitUntilStackDeleteComplete({ client: cfn, maxWaitTime: MAX_WAIT_SECONDS }, { StackName: name });
+  } finally {
+    stop();
+  }
 }
 
 export function outputsOf(stack: Stack): Record<string, string> {

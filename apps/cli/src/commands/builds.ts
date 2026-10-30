@@ -1,3 +1,4 @@
+import { colorStatus, ui } from '../lib/ui.js';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { duration, envOf, recentBuilds, shortId } from '../lib/builds.js';
 import { table, timeAgo } from '../lib/format.js';
@@ -37,8 +38,8 @@ export async function builds(opts: BuildsOptions, global: GlobalOptions): Promis
   console.log(
     table(
       ['BUILD', 'PROJECT', 'STATUS', 'SOURCE', 'DEPLOYMENT', 'STARTED', 'TOOK'],
-      rows.map((r) => [r.build, r.project, r.status, r.source, r.deployment, timeAgo(r.startedAt), r.duration]),
+      rows.map((r) => [r.build, ui.name(r.project), colorStatus(r.status), r.source, r.deployment, timeAgo(r.startedAt), r.duration]),
     ),
   );
-  console.log('\nLogs: deployer logs <build>');
+  console.log(ui.dim('\nLogs: deployer logs <build>'));
 }

@@ -1,3 +1,4 @@
+import { ui, uiErr } from '../lib/ui.js';
 import { randomBytes } from 'node:crypto';
 import {
   assertProjectName,
@@ -91,7 +92,7 @@ export async function connect(opts: ConnectOptions, global: GlobalOptions): Prom
     webhookNote = `webhook ${hook.created ? 'created' : 'updated'} (id ${hook.id})`;
   } catch (err) {
     webhookNote = 'webhook NOT registered';
-    console.warn(`\nCould not register the webhook (${explainGithubError(err, opts.repo).message}).`);
+    console.warn(uiErr.yellow(`\nCould not register the webhook (${explainGithubError(err, opts.repo).message}).`));
     console.warn(
       'Add it yourself: repository > Settings > Webhooks > Add webhook\n' +
         `  Payload URL:  ${stack.webhookUrl}\n` +
@@ -119,8 +120,8 @@ export async function connect(opts: ConnectOptions, global: GlobalOptions): Prom
   // Without a host or domain the project is served at an address of its own; create it now so pushes have somewhere to go.
   const siteHost = await ensureProjectSite(out, global, opts.project, host ? [host] : undefined);
 
-  console.log(`\nConnected ${opts.project} to ${repo.full_name} (${branch}): ${webhookNote}.`);
-  console.log(`Every push to ${branch} now builds and deploys to ${host ?? siteHost ?? out.domain}.`);
+  console.log(`\n${ui.ok(`Connected ${ui.name(opts.project)} to ${ui.name(repo.full_name)} (${branch}): ${webhookNote}.`)}`);
+  console.log(`Every push to ${branch} now builds and deploys to ${ui.url(host ?? siteHost ?? out.domain)}.`);
   if (opts.previews) {
     console.log(`Every pull request into ${branch} now gets its own preview URL, removed when the pull request closes.`);
     console.log('The GitHub token needs "Pull requests: Read and write" for the preview comment (fine-grained token) or the repo scope (classic).');
@@ -128,7 +129,7 @@ export async function connect(opts: ConnectOptions, global: GlobalOptions): Prom
       console.warn('\nNo preview domain is set up yet, so no preview can be served. Add one with:\n  deployer domain add "*.preview.<your domain>" --preview');
     }
   }
-  console.log(`Deploy the current head now with: deployer github deploy -p ${opts.project}`);
+  console.log(`${ui.dim('Deploy the current head now with:')} ${ui.accent(`deployer github deploy -p ${opts.project}`)}`);
 }
 
 export async function githubDeploy(opts: { project: string; detach?: boolean }, global: GlobalOptions): Promise<void> {
@@ -150,7 +151,7 @@ export async function githubDeploy(opts: { project: string; detach?: boolean }, 
   } catch (err) {
     throw explainGithubError(err, source.repo);
   }
-  console.log(`Building ${source.repo}@${sha.slice(0, 7)} (${source.branch})`);
+  console.log(ui.step(`Building ${ui.name(source.repo)}@${sha.slice(0, 7)} (${source.branch})`));
 
   const buildId = await startBuild(stack.buildProject, {
     project: opts.project,
@@ -182,7 +183,7 @@ export async function disconnect(opts: { project: string }, global: GlobalOption
   await updateManifest(out.bucket, opts.project, (m) => {
     delete m.source;
   });
-  console.log(`Disconnected ${opts.project}. Its deployments are unchanged.`);
+  console.log(ui.ok(`Disconnected ${ui.name(opts.project)}. Its deployments are unchanged.`));
 }
 
 /** Replaces the webhook secret and re-registers the webhook on every connected repository. */
@@ -194,7 +195,7 @@ export async function rotateSecret(global: GlobalOptions): Promise<void> {
 
   const secret = randomBytes(30).toString('base64url');
   await putSecret(stack.webhookSecretArn, secret);
-  console.log('Stored a new webhook secret.');
+  console.log(ui.ok('Stored a new webhook secret.'));
   if (repos.size === 0) {
     console.log('No project is connected to GitHub, so there is no webhook to update.');
     return;

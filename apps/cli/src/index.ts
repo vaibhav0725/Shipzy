@@ -3,6 +3,7 @@ import * as dns from 'node:dns';
 import * as net from 'node:net';
 import { Command } from 'commander';
 import { configureEnv, errorMessage, GlobalOptions } from './lib/aws.js';
+import { uiErr } from './lib/ui.js';
 import { builds } from './commands/builds.js';
 import { dashboard } from './commands/dashboard.js';
 import { deploy } from './commands/deploy.js';
@@ -255,6 +256,6 @@ program
   .parseAsync()
   .then(() => process.exit(process.exitCode ?? 0))
   .catch((err) => {
-    console.error(`Error: ${errorMessage(err)}`);
+    console.error(`${uiErr.red(uiErr.bold('Error:'))} ${errorMessage(err)}`);
     process.exit(1);
   });

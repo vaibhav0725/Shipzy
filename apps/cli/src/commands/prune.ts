@@ -1,3 +1,4 @@
+import { ui } from '../lib/ui.js';
 import { assertProjectName, prune } from '@deployer/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 
@@ -20,6 +21,6 @@ export async function pruneCommand(opts: PruneCommandOptions, global: GlobalOpti
   const verb = opts.dryRun ? 'Would delete' : 'Deleted';
   for (const id of result.expired) console.log(`${verb} ${id} (beyond the newest ${opts.keep})`);
   for (const id of result.orphans) console.log(`${verb} ${id} (upload that was never promoted)`);
-  if (result.expired.length + result.orphans.length === 0) console.log('Nothing to prune.');
+  if (result.expired.length + result.orphans.length === 0) console.log(ui.dim('Nothing to prune.'));
 }
 

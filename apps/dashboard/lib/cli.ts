@@ -29,6 +29,9 @@ export function childEnv(extra?: Record<string, string>): NodeJS.ProcessEnv {
       delete env[name];
     }
   }
+  // The dashboard's logs are plain text: never let the CLI colour its output, whatever the user's shell sets.
+  delete env.FORCE_COLOR;
+  env.NO_COLOR = '1';
   return { ...env, ...extra };
 }
 

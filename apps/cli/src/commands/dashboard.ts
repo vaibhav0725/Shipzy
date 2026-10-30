@@ -1,3 +1,4 @@
+import { ui } from '../lib/ui.js';
 import { type ChildProcess, spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
@@ -100,10 +101,10 @@ export async function dashboard(opts: DashboardOptions, global: GlobalOptions): 
   });
 
   const url = `http://127.0.0.1:${port}/?token=${token}`;
-  console.log(`Dashboard running for stack "${global.stackName}" (${process.env.AWS_REGION}).`);
-  console.log(`\n  ${url}\n`);
-  console.log('Open that address (it signs your browser in; the link is only good for this run). Press Ctrl-C to stop.');
-  console.log('Actions you start here run on this computer, using your AWS profile, exactly like the CLI.');
+  console.log(ui.ok(`${ui.bold('Dashboard running')} for stack ${ui.name(`"${global.stackName}"`)} (${process.env.AWS_REGION}).`));
+  console.log(`\n  ${ui.url(url)}\n`);
+  console.log(ui.dim('Open that address (it signs your browser in; the link is only good for this run). Press Ctrl-C to stop.'));
+  console.log(ui.dim('Actions you start here run on this computer, using your AWS profile, exactly like the CLI.'));
   if (opts.open) openBrowser(url);
 
   const code = await exited;

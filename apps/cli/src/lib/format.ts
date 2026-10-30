@@ -1,3 +1,5 @@
+import { ui, visibleLength } from './ui.js';
+
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   const units = ['KB', 'MB', 'GB', 'TB'];
@@ -21,9 +23,17 @@ export function timeAgo(iso: string | undefined, now = Date.now()): string {
   return `${Math.round(hours / 24)} d ago`;
 }
 
-/** Left-aligned plain-text table with a header row. */
+/**
+ * Left-aligned table with a header row. Cells may contain colour codes: columns are sized by what shows on screen.
+ * On a terminal the header is bold and the rule beneath it dim; in a pipe the output is plain text.
+ */
 export function table(headers: string[], rows: string[][]): string {
-  const widths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => (r[i] ?? '').length)));
-  const line = (cells: string[]) => cells.map((c, i) => c.padEnd(widths[i]!)).join('  ').trimEnd();
-  return [line(headers), line(widths.map((w) => '-'.repeat(w))), ...rows.map(line)].join('\n');
+  const widths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => visibleLength(r[i] ?? ''))));
+  const pad = (cell: string, width: number) => cell + ' '.repeat(Math.max(0, width - visibleLength(cell)));
+  const line = (cells: string[]) => cells.map((c, i) => pad(c, widths[i]!)).join('  ').trimEnd();
+  return [
+    line(headers.map((h) => ui.bold(h))),
+    ui.dim(line(widths.map((w) => '-'.repeat(w)))),
+    ...rows.map(line),
+  ].join('\n');
 }

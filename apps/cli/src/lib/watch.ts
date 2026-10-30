@@ -1,3 +1,4 @@
+import { ui } from './ui.js';
 import { describeFailure, duration, streamLogs } from './builds.js';
 
 /**
@@ -6,7 +7,7 @@ import { describeFailure, duration, streamLogs } from './builds.js';
  */
 export async function watchBuild(buildId: string, hosts: string[], project: string, detach: boolean): Promise<void> {
   const short = buildId.split(':').pop()!.slice(0, 8);
-  console.log(`Started build ${short} for ${project}\n`);
+  console.log(`${ui.step(`Started build ${ui.name(short)} for ${ui.name(project)}`)}\n`);
 
   if (detach) {
     console.log(`Follow it:  deployer logs ${short} -f\nAll builds: deployer builds -p ${project}`);
@@ -21,6 +22,6 @@ export async function watchBuild(buildId: string, hosts: string[], project: stri
   const finished = await streamLogs(buildId, true);
   if (finished.buildStatus !== 'SUCCEEDED') throw new Error(describeFailure(finished));
 
-  console.log(`\nLive: ${hosts.map((h) => `https://${h}`).join(', ')}  (build took ${duration(finished)})`);
-  console.log('(Routing changes propagate to the edge in roughly 30 seconds.)');
+  console.log(`\n${ui.ok(ui.bold(ui.green('Live:')))} ${hosts.map((h) => ui.url(`https://${h}`)).join(', ')}  ${ui.dim(`(build took ${duration(finished)})`)}`);
+  console.log(ui.dim('(Routing changes propagate to the edge in roughly 30 seconds.)'));
 }

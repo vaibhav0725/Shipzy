@@ -1,3 +1,4 @@
+import { ui } from '../lib/ui.js';
 import {
   assertProjectName,
   DEFAULT_KEEP,
@@ -65,7 +66,7 @@ export async function repoDeploy(input: string, opts: DeployOptions & { branch?:
   } catch (err) {
     throw explainGithubError(err, `${repo.full_name}@${branch}`);
   }
-  console.log(`Building ${repo.full_name}@${sha.slice(0, 7)} (${branch}) as "${project}"${repo.private ? '' : ' - public repository, no token used'}`);
+  console.log(ui.step(`Building ${ui.name(repo.full_name)}@${sha.slice(0, 7)} (${branch}) as ${ui.name(`"${project}"`)}${repo.private ? '' : ' - public repository, no token used'}`));
 
   const explicit = opts.host ? [opts.host.toLowerCase()] : undefined;
   await ensureProjectSite(out, global, project, explicit);

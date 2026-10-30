@@ -1,3 +1,4 @@
+import { spinner, ui, uiErr } from '../lib/ui.js';
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import {
@@ -28,9 +29,9 @@ const BUILD_SCRIPT_KEY = 'scripts/build.sh';
 
 export async function init(opts: GlobalOptions): Promise<void> {
   const me = await whoAmI();
-  console.log(`AWS account ${me.account} (${me.arn})`);
+  console.log(`${ui.dim('AWS account')} ${ui.name(me.account)} ${ui.dim(`(${me.arn})`)}`);
   if (me.arn.endsWith(':root')) {
-    console.warn('Warning: you are using root credentials. Prefer an IAM user or SSO profile.');
+    console.warn(`${uiErr.yellow(uiErr.bold('Warning:'))} you are using root credentials. Prefer an IAM user or SSO profile.`);
   }
 
   for (const name of ['template.json', 'engine.zip', 'build.sh']) {
@@ -67,7 +68,7 @@ export async function init(opts: GlobalOptions): Promise<void> {
     .send(new HeadObjectCommand({ Bucket: out.buildsBucket, Key: engineKey }))
     .then(() => true, () => false);
   if (!exists) {
-    console.log(`Uploading engine code (${(engineZip.length / 1048576).toFixed(1)} MB)...`);
+    console.log(ui.step(`Uploading engine code (${(engineZip.length / 1048576).toFixed(1)} MB)...`));
     await client.send(new PutObjectCommand({ Bucket: out.buildsBucket, Key: engineKey, Body: engineZip }));
   }
 
@@ -77,7 +78,7 @@ export async function init(opts: GlobalOptions): Promise<void> {
     .send(new HeadObjectCommand({ Bucket: out.buildsBucket, Key: BUILD_SCRIPT_KEY }))
     .catch(() => undefined);
   if (stored?.Metadata?.['sha256'] !== scriptSha) {
-    console.log('Updating the build script...');
+    console.log(ui.step('Updating the build script...'));
     await client.send(
       new PutObjectCommand({
         Bucket: out.buildsBucket,
@@ -91,10 +92,10 @@ export async function init(opts: GlobalOptions): Promise<void> {
 
   // 3. Point the stack's Lambda functions at it.
   if (engineKeyOf(stack) !== engineKey) {
-    console.log('Installing the engine...');
+    console.log(ui.step('Installing the engine...'));
     await applyStack(opts.stackName, templateBody, engineKey, false);
   } else if (!changed) {
-    console.log('Already up to date.');
+    console.log(ui.ok('Already up to date.'));
   }
 
   await printSummary(opts.stackName);
@@ -111,11 +112,16 @@ async function applyStack(stackName: string, templateBody: string, engineKey: st
   };
 
   if (create) {
-    console.log(`Creating stack "${stackName}" (CloudFront takes ~5 minutes)...`);
+    console.log(ui.step(`Creating stack ${ui.name(`"${stackName}"`)} (CloudFront takes ~5 minutes)...`));
     await cfn.send(new CreateStackCommand(common));
-    await waitOrExplain(cfn, stackName, () =>
-      waitUntilStackCreateComplete({ client: cfn, maxWaitTime: MAX_WAIT_SECONDS }, { StackName: stackName }),
-    );
+    const stop = spinner(`Creating ${stackName}`);
+    try {
+      await waitOrExplain(cfn, stackName, () =>
+        waitUntilStackCreateComplete({ client: cfn, maxWaitTime: MAX_WAIT_SECONDS }, { StackName: stackName }),
+      );
+    } finally {
+      stop();
+    }
     return true;
   }
 
@@ -125,10 +131,15 @@ async function applyStack(stackName: string, templateBody: string, engineKey: st
     if (errorMessage(err).includes('No updates are to be performed')) return false;
     throw err;
   }
-  console.log(`Updating stack "${stackName}"...`);
-  await waitOrExplain(cfn, stackName, () =>
-    waitUntilStackUpdateComplete({ client: cfn, maxWaitTime: MAX_WAIT_SECONDS }, { StackName: stackName }),
-  );
+  console.log(ui.step(`Updating stack ${ui.name(`"${stackName}"`)}...`));
+  const stop = spinner(`Updating ${stackName}`);
+  try {
+    await waitOrExplain(cfn, stackName, () =>
+      waitUntilStackUpdateComplete({ client: cfn, maxWaitTime: MAX_WAIT_SECONDS }, { StackName: stackName }),
+    );
+  } finally {
+    stop();
+  }
   return true;
 }
 
@@ -136,11 +147,11 @@ async function printSummary(stackName: string): Promise<void> {
   const stack = await findStack(stackName);
   if (!stack) throw new Error('Stack disappeared unexpectedly.');
   const out = readOutputs(stack);
-  console.log('\nReady.');
-  console.log(`  Bucket:       ${out.bucket}`);
-  console.log(`  Distribution: ${out.distributionId}`);
-  console.log(`  Default URL:  https://${out.domain}`);
-  console.log(`  Builds:       ${out.buildProject}`);
-  console.log(`  Webhook URL:  ${out.webhookUrl}`);
-  console.log('\nNext: deployer deploy <react-app-dir> --project <name>');
+  console.log(`\n${ui.ok(ui.bold(ui.green('Ready.')))}`);
+  console.log(`  ${ui.dim('Bucket:      ')} ${out.bucket}`);
+  console.log(`  ${ui.dim('Distribution:')} ${out.distributionId}`);
+  console.log(`  ${ui.dim('Default URL: ')} ${ui.url(`https://${out.domain}`)}`);
+  console.log(`  ${ui.dim('Builds:      ')} ${out.buildProject}`);
+  console.log(`  ${ui.dim('Webhook URL: ')} ${out.webhookUrl}`);
+  console.log(`\n${ui.bold('Next:')} ${ui.accent('deployer deploy <react-app-dir> --project <name>')}`);
 }

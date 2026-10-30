@@ -1,3 +1,4 @@
+import { ui } from '../lib/ui.js';
 import * as fs from 'node:fs';
 import {
   assertEnvName,
@@ -54,7 +55,7 @@ export async function envSet(nameArg: string, valueArg: string | undefined, opts
     m.env ??= { production: [], preview: [] };
     if (!m.env[scope].includes(name)) m.env[scope].push(name);
   });
-  console.log(`Set ${name} for ${scope} builds of ${opts.project}.`);
+  console.log(ui.ok(`Set ${ui.name(name)} for ${scope} builds of ${opts.project}.`));
   console.log(APPLY_HINT(opts.project));
 }
 
@@ -104,10 +105,10 @@ export async function envList(opts: { project: string; json?: boolean }, global:
   console.log(
     table(
       ['NAME', 'PRODUCTION', 'PREVIEW OVERRIDE'],
-      rows.map((r) => [r.name, r.production ? 'yes' : '-', r.preview ? 'yes' : '-']),
+      rows.map((r) => [ui.name(r.name), r.production ? ui.green('yes') : ui.dim('-'), r.preview ? ui.green('yes') : ui.dim('-')]),
     ),
   );
-  console.log('\nValues are never shown. Preview builds use the production value unless a preview override exists.');
+  console.log(ui.dim('\nValues are never shown. Preview builds use the production value unless a preview override exists.'));
 }
 
 export async function envRemove(name: string, opts: EnvSetOptions, global: GlobalOptions): Promise<void> {
