@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import FolderPicker, { FolderListing } from '@/components/FolderPicker';
 import GithubConnect, { RepoRow } from '@/components/GithubConnect';
 import { ErrorNotice } from '@/components/bits';
+import { Icon } from '@/components/Icons';
 import { api, Manifest, startAction } from '@/lib/client';
 
 type Source = 'folder' | 'github';
@@ -122,22 +123,42 @@ export default function NewDeployment() {
     }
   }
 
+  const summary =
+    source === 'folder'
+      ? `Deploy ${project || 'your project'} from ${dir.trim() ? dir.trim().split('/').filter(Boolean).slice(-1)[0] : 'a folder'}${remote ? ', built in AWS' : ''}`
+      : mode === 'auto'
+        ? `Connect ${repo.trim() || 'a repository'} and deploy on every push`
+        : `Deploy ${repo.trim() || 'a repository'} once`;
+
   return (
-    <>
+    <div className="narrow">
       <div className="head">
         <div>
           <h1>New deployment</h1>
-          <p className="muted">Deploy a React project from a folder on this computer, or from a GitHub repository.</p>
+          <p className="sub">Put a React project live on its own address in your AWS account.</p>
         </div>
       </div>
 
       <form onSubmit={submit}>
-        <div className="card">
-          <div className="tabs" role="tablist">
-            <button type="button" className={source === 'folder' ? 'on' : ''} onClick={() => setSource('folder')}>Folder on this computer</button>
-            <button type="button" className={source === 'github' ? 'on' : ''} onClick={() => setSource('github')}>GitHub repository</button>
-          </div>
+        <div className="step"><b>1</b><h2>Choose a source</h2></div>
+        <div className="sources" role="tablist">
+          <button type="button" role="tab" aria-selected={source === 'folder'} className={`source ${source === 'folder' ? 'on' : ''}`} onClick={() => setSource('folder')}>
+            <span className="ic"><Icon name="folder" /></span>
+            <span>
+              <strong>Folder on this computer</strong>
+              <span className="d">Build here or in AWS, then upload</span>
+            </span>
+          </button>
+          <button type="button" role="tab" aria-selected={source === 'github'} className={`source ${source === 'github' ? 'on' : ''}`} onClick={() => setSource('github')}>
+            <span className="ic"><Icon name="github" /></span>
+            <span>
+              <strong>GitHub repository</strong>
+              <span className="d">Pick one of yours or paste a link</span>
+            </span>
+          </button>
+        </div>
 
+        <div className="card" style={{ marginTop: 14 }}>
           {source === 'folder' ? (
             <>
               <label className="field">
@@ -154,7 +175,7 @@ export default function NewDeployment() {
                   </small>
                 )}
               </label>
-              <label className="field">
+              <label className="field" style={{ marginBottom: 0 }}>
                 <span>Where to build</span>
                 <select value={remote ? 'aws' : 'local'} onChange={(e) => setRemote(e.target.value === 'aws')}>
                   <option value="local">On this computer (fast; uses your local .env)</option>
@@ -194,7 +215,7 @@ export default function NewDeployment() {
                 </select>
               </label>
               {mode === 'once' ? (
-                <p className="muted small">
+                <p className="muted small" style={{ marginBottom: 0 }}>
                   {picked?.private && <strong>This repository is private, so deploying it once will fail without a token. Choose the second option. </strong>}
                   The build runs in your AWS account. Pushes do not redeploy; you can connect the repository later from the project&apos;s
                   GitHub tab. A private repository needs a token to be stored first: choose the second option once.
@@ -218,7 +239,7 @@ export default function NewDeployment() {
                     </div>
                   )}
                   {!reuse && !useLogin && (
-                    <label className="field">
+                    <label className="field" style={{ marginBottom: 0 }}>
                       <span>GitHub token</span>
                       <input type="password" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" placeholder="github_pat_..." required />
                       <small>
@@ -233,6 +254,7 @@ export default function NewDeployment() {
           )}
         </div>
 
+        <div className="step" style={{ marginTop: 26 }}><b>2</b><h2>Name and address</h2></div>
         <div className="card">
           <label className="field">
             <span>Project name</span>
@@ -241,7 +263,7 @@ export default function NewDeployment() {
           </label>
 
           <label className="field">
-            <span>Serve at</span>
+            <span>Serve at <span className="faint" style={{ fontWeight: 400 }}>(optional)</span></span>
             <input type="text" value={host} onChange={(e) => setHost(e.target.value)} placeholder={domains.length ? domains.join(', ') + ' (its domains)' : 'a hostname that already points at your stack'} spellCheck={false} />
             <small>
               {domains.length > 0
@@ -259,7 +281,7 @@ export default function NewDeployment() {
                 <span>Install command</span>
                 <input type="text" value={install} onChange={(e) => setInstall(e.target.value)} placeholder="npm ci --legacy-peer-deps" spellCheck={false} />
               </label>
-              <label className="field">
+              <label className="field" style={{ marginBottom: 0 }}>
                 <span>Build command</span>
                 <input type="text" value={build} onChange={(e) => setBuild(e.target.value)} placeholder="npm run build" spellCheck={false} />
               </label>
@@ -268,12 +290,16 @@ export default function NewDeployment() {
         </div>
 
         <ErrorNotice message={error} />
-        <button className="primary" disabled={busy || !NAME_RE.test(project)}>
-          {busy ? 'Starting...' : source === 'github' && mode === 'auto' ? 'Connect and deploy' : 'Deploy'}
-        </button>
+        <div className="actionbar">
+          <button className="primary" disabled={busy || !NAME_RE.test(project)}>
+            <Icon name="rocket" />
+            {busy ? 'Starting...' : source === 'github' && mode === 'auto' ? 'Connect and deploy' : 'Deploy'}
+          </button>
+          <span className="muted small">{summary}</span>
+        </div>
       </form>
 
       {picking && <FolderPicker start={dir.startsWith('/') ? dir : undefined} onClose={() => setPicking(false)} onPick={(p) => { setDir(p); setPicking(false); }} />}
-    </>
+    </div>
   );
 }

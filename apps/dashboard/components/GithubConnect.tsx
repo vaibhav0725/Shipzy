@@ -195,36 +195,23 @@ export default function GithubConnect(props: { selected: string; onSession: (con
         </button>
       </div>
       <ErrorNotice message={error ?? repos.error} />
-      <input type="text" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search your repositories" spellCheck={false} />
-      <div className="tablewrap" style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8 }}>
+      <input type="text" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search your repositories" spellCheck={false} style={{ marginBottom: 8 }} />
+      <div className="picker">
         {repos.loading ? (
-          <p className="muted small" style={{ padding: 10 }}>Loading your repositories...</p>
+          <p className="muted small" style={{ padding: 12, margin: 0 }}>Loading your repositories...</p>
         ) : shown.length === 0 ? (
-          <p className="muted small" style={{ padding: 10 }}>No repository matches.</p>
+          <p className="muted small" style={{ padding: 12, margin: 0 }}>No repository matches.</p>
         ) : (
           shown.map((r) => (
-            <button
-              type="button"
-              key={r.repo}
-              onClick={() => props.onPick(r)}
-              style={{
-                display: 'block',
-                width: '100%',
-                textAlign: 'left',
-                border: 0,
-                borderBottom: '1px solid var(--line)',
-                borderRadius: 0,
-                background: r.repo === props.selected ? 'var(--accent-bg, var(--line))' : 'none',
-              }}
-            >
+            <button type="button" key={r.repo} className={r.repo === props.selected ? 'on' : ''} onClick={() => props.onPick(r)}>
               <span className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
                 <strong>{r.repo}</strong>
                 <span className="row" style={{ flexWrap: 'nowrap' }}>
                   {r.private && <Badge>private</Badge>}
-                  <span className="muted small">{timeAgo(r.pushedAt)}</span>
+                  <span className="muted small nowrap">{timeAgo(r.pushedAt)}</span>
                 </span>
               </span>
-              {r.description && <span className="muted small">{r.description}</span>}
+              {r.description && <span className="muted small" style={{ display: 'block', marginTop: 2 }}>{r.description}</span>}
             </button>
           ))
         )}

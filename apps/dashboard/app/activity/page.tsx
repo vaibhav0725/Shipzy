@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { StatusBadge } from '@/components/bits';
+import { EmptyState, StatusBadge } from '@/components/bits';
+import { Icon } from '@/components/Icons';
 import { JobInfo, timeAgo, useApi } from '@/lib/client';
 
 export default function Activity() {
@@ -11,11 +12,19 @@ export default function Activity() {
       <div className="head">
         <div>
           <h1>Activity</h1>
-          <p className="muted">Actions started from this dashboard. Kept in memory while it runs.</p>
+          <p className="sub">Everything you started from this dashboard, with its full output. Kept while the dashboard runs.</p>
         </div>
       </div>
       {error && <div className="notice bad">{error}</div>}
-      {data && data.length === 0 && <div className="card muted">Nothing yet.</div>}
+      {data && data.length === 0 && (
+        <EmptyState icon="terminal" title="Nothing yet">
+          <p>Deploys, rollbacks, domain changes and other actions you start here appear in this list, each with its log.</p>
+          <Link className="btn primary" href="/projects/new">
+            <Icon name="rocket" />
+            New deployment
+          </Link>
+        </EmptyState>
+      )}
       {data && data.length > 0 && (
         <div className="card tablewrap">
           <table>
@@ -23,11 +32,11 @@ export default function Activity() {
             <tbody>
               {data.map((j) => (
                 <tr key={j.id}>
-                  <td>{j.label}</td>
+                  <td><Link href={`/jobs/${j.id}`}><strong>{j.label}</strong></Link></td>
                   <td>{j.project ? <Link href={`/projects/${j.project}`}>{j.project}</Link> : <span className="muted">-</span>}</td>
                   <td><StatusBadge status={j.status} /></td>
-                  <td>{timeAgo(j.startedAt)}</td>
-                  <td><Link href={`/jobs/${j.id}`}>Open log</Link></td>
+                  <td className="nowrap muted">{timeAgo(j.startedAt)}</td>
+                  <td className="actions"><Link href={`/jobs/${j.id}`}>Open log</Link></td>
                 </tr>
               ))}
             </tbody>

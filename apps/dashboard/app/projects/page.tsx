@@ -1,56 +1,63 @@
 'use client';
 
 import Link from 'next/link';
-import { ErrorNotice } from '@/components/bits';
-import { formatBytes, ProjectSummary, siteUrl, timeAgo, useApi } from '@/lib/client';
+import { useMemo, useState } from 'react';
+import { EmptyState, ErrorNotice, Skeleton } from '@/components/bits';
+import { Icon } from '@/components/Icons';
+import ProjectCard from '@/components/ProjectCard';
+import { ProjectSummary, useApi } from '@/lib/client';
 
 export default function Projects() {
   const { data, error, loading, reload } = useApi<ProjectSummary[]>('/api/projects', { interval: 20000 });
+  const [query, setQuery] = useState('');
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const all = data ?? [];
+    if (!q) return all;
+    return all.filter((p) => [p.name, p.source?.repo ?? '', ...p.live.map((l) => l.host), ...p.domains].some((t) => t.toLowerCase().includes(q)));
+  }, [data, query]);
+
   return (
     <>
       <div className="head">
         <div>
           <h1>Projects</h1>
-          <p className="muted">Everything deployed to this stack.</p>
+          <p className="sub">{data ? `${data.length} project${data.length === 1 ? '' : 's'} in this stack.` : 'Everything deployed to this stack.'}</p>
         </div>
         <div className="row">
-          <button onClick={() => void reload()}>Refresh</button>
-          <Link className="btn primary" href="/projects/new">New deployment</Link>
+          <button onClick={() => void reload()}>
+            <Icon name="refresh" />
+            Refresh
+          </button>
+          <Link className="btn primary" href="/projects/new">
+            <Icon name="plus" />
+            New deployment
+          </Link>
         </div>
       </div>
+
       <ErrorNotice message={error} />
-      {loading && !data && <p className="muted">Loading...</p>}
+      {data && data.length > 3 && (
+        <div className="row" style={{ marginBottom: 16 }}>
+          <label className="search">
+            <Icon name="search" />
+            <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name, repository or address" spellCheck={false} />
+          </label>
+        </div>
+      )}
+      {loading && !data && (
+        <div className="cards">
+          {[0, 1, 2].map((i) => <div className="pcard" key={i}><Skeleton height={38} /><Skeleton width="70%" /><Skeleton width="50%" /></div>)}
+        </div>
+      )}
       {data && data.length === 0 && (
-        <div className="card">
-          <p>No projects yet.</p>
+        <EmptyState icon="layers" title="No projects yet">
+          <p>Deploy a React project from a folder or a GitHub repository. Each project gets its own address.</p>
           <Link className="btn primary" href="/projects/new">Deploy your first project</Link>
-        </div>
+        </EmptyState>
       )}
-      {data && data.length > 0 && (
-        <div className="card tablewrap">
-          <table>
-            <thead>
-              <tr><th>Project</th><th>Live on</th><th>Deployed</th><th>Auto-deploy from</th><th>Versions</th><th>Size</th></tr>
-            </thead>
-            <tbody>
-              {data.map((p) => (
-                <tr key={p.name}>
-                  <td><Link href={`/projects/${p.name}`}><strong>{p.name}</strong></Link></td>
-                  <td>
-                    {p.live.length === 0 ? <span className="muted">not live</span> : p.live.map((l) => (
-                      <div key={l.host}><a href={siteUrl(l.host)} target="_blank" rel="noreferrer">{l.host}</a></div>
-                    ))}
-                  </td>
-                  <td>{timeAgo(p.live[0]?.deployedAt ?? p.lastDeployedAt)}</td>
-                  <td>{p.source ? `${p.source.repo}@${p.source.branch}` : <span className="muted">-</span>}</td>
-                  <td>{p.versions}</td>
-                  <td>{formatBytes(p.bytes)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {data && data.length > 0 && shown.length === 0 && <p className="muted">Nothing matches &quot;{query}&quot;.</p>}
+      {shown.length > 0 && <div className="cards">{shown.map((p) => <ProjectCard key={p.name} project={p} />)}</div>}
     </>
   );
 }

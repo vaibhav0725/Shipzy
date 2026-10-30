@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ReactNode, useState } from 'react';
-import { Badge, Confirm, ErrorNotice, StatusBadge } from '@/components/bits';
+import { ReactNode, useEffect, useState } from 'react';
+import { Avatar, Badge, Confirm, CopyButton, ErrorNotice, StatusBadge } from '@/components/bits';
+import { Icon } from '@/components/Icons';
 import { BuildRow, DomainRow, EnvRow, Manifest, PreviewsInfo, siteUrl, startAction, timeAgo, useApi } from '@/lib/client';
 
 type Tab = 'deployments' | 'domains' | 'environment' | 'github' | 'previews' | 'builds';
@@ -24,6 +25,16 @@ export default function ProjectPage() {
   const [error, setError] = useState<string>();
   const manifest = useApi<Manifest>(`/api/projects/${name}`, { interval: 15000 });
 
+  // /projects/<name>?tab=domains opens that tab, and the address follows the tab you are on.
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get('tab');
+    if (TABS.some((t) => t.id === wanted)) setTab(wanted as Tab);
+  }, []);
+  const choose = (t: Tab) => {
+    setTab(t);
+    window.history.replaceState(null, '', `?tab=${t}`);
+  };
+
   const liveHosts = Object.keys(manifest.data?.live ?? {});
 
   async function run(body: Record<string, unknown>) {
@@ -36,35 +47,105 @@ export default function ProjectPage() {
     }
   }
 
+  const m = manifest.data;
+  const domains = m?.domains ?? [];
+  // The address to open: a custom domain first, then the project's own address, then whatever it is live on.
+  const primary = liveHosts.find((h) => domains.includes(h)) ?? (m?.siteHost && liveHosts.includes(m.siteHost) ? m.siteHost : undefined) ?? liveHosts[0];
+  const latest = m?.deployments.filter((d) => d.preview === undefined).at(-1);
+  const counts: Partial<Record<Tab, number>> = {
+    domains: domains.length,
+    environment: new Set([...(m?.env?.production ?? []), ...(m?.env?.preview ?? [])]).size,
+    previews: Object.keys(m?.previews ?? {}).length,
+  };
+
   return (
     <>
+      <div className="crumbs">
+        <Link href="/projects">Projects</Link>
+        <span>/</span>
+        <span>{name}</span>
+      </div>
       <div className="head">
-        <div>
-          <h1>{name}</h1>
-          <p className="muted">
-            {liveHosts.length === 0 ? 'Not live anywhere.' : liveHosts.map((h, i) => (
-              <span key={h}>{i > 0 && ', '}<a href={siteUrl(h)} target="_blank" rel="noreferrer">{h}</a></span>
-            ))}
-          </p>
+        <div className="row" style={{ gap: 14, flexWrap: 'nowrap' }}>
+          <Avatar name={name} large />
+          <div>
+            <h1>{name}</h1>
+            <div className="row" style={{ marginTop: 6 }}>
+              {m ? (
+                <Badge kind={liveHosts.length ? 'ok' : undefined} dot>
+                  {liveHosts.length ? 'Live' : 'Offline'}
+                </Badge>
+              ) : null}
+              {m?.source && (
+                <a className="small muted row" style={{ gap: 5 }} href={`https://github.com/${m.source.repo}`} target="_blank" rel="noreferrer">
+                  <Icon name="github" size={14} />
+                  {m.source.repo} · {m.source.branch}
+                </a>
+              )}
+            </div>
+          </div>
         </div>
         <div className="row">
-          <Link className="btn" href={`/projects/new?project=${name}`}>Deploy a new version</Link>
-          <button className="danger" onClick={() => setDeleting(true)}>Delete project</button>
+          {primary && (
+            <a className="btn primary" href={siteUrl(primary)} target="_blank" rel="noreferrer">
+              <Icon name="external" />
+              Visit
+            </a>
+          )}
+          <Link className="btn" href={`/projects/new?project=${name}`}>
+            <Icon name="rocket" />
+            Deploy new version
+          </Link>
+          <button className="danger" onClick={() => setDeleting(true)}>
+            <Icon name="trash" />
+            Delete
+          </button>
         </div>
       </div>
 
       <ErrorNotice message={error ?? manifest.error} />
 
+      {m && (
+        <div className="strip">
+          <div>
+            <div className="l">{liveHosts.length > 1 ? 'Live addresses' : 'Live address'}</div>
+            {liveHosts.length === 0 ? (
+              <div className="v muted">Not live</div>
+            ) : (
+              liveHosts.slice(0, 2).map((h) => (
+                <div className="v row" key={h} style={{ flexWrap: 'nowrap', gap: 2 }}>
+                  <a href={siteUrl(h)} target="_blank" rel="noreferrer" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{h}</a>
+                  <CopyButton text={siteUrl(h)} />
+                </div>
+              ))
+            )}
+          </div>
+          <div>
+            <div className="l">Source</div>
+            <div className="v">{m.source ? <>Pushes to <span className="mono">{m.source.branch}</span></> : <span className="muted">Manual deploys</span>}</div>
+          </div>
+          <div>
+            <div className="l">Last deployed</div>
+            <div className="v">{latest ? timeAgo(latest.createdAt) : '-'}</div>
+          </div>
+          <div>
+            <div className="l">Versions</div>
+            <div className="v">{m.deployments.filter((d) => d.preview === undefined).length}</div>
+          </div>
+        </div>
+      )}
+
       <div className="tabs" role="tablist">
         {TABS.map((t) => (
-          <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
+          <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'on' : ''} onClick={() => choose(t.id)}>
             {t.label}
+            {counts[t.id] ? <> <span className="count">{counts[t.id]}</span></> : null}
           </button>
         ))}
       </div>
 
       {tab === 'deployments' && <Deployments name={name} manifest={manifest.data} run={run} />}
-      {tab === 'domains' && <Domains name={name} run={run} />}
+      {tab === 'domains' && <Domains name={name} siteHost={m?.siteHost} run={run} />}
       {tab === 'environment' && <Environment name={name} run={run} />}
       {tab === 'github' && <Github name={name} manifest={manifest.data} run={run} />}
       {tab === 'previews' && <Previews name={name} manifest={manifest.data} run={run} />}
@@ -110,10 +191,10 @@ function Deployments({ name, manifest, run }: { name: string; manifest?: Manifes
                 <td>{timeAgo(d.createdAt)}</td>
                 <td>{d.files}</td>
                 <td>{(liveOf.get(d.id) ?? []).map((h) => <div key={h}><Badge kind="ok">live</Badge> {h}</div>)}</td>
-                <td>{!liveOf.has(d.id) && <button className="small" onClick={() => setRollback(d.id)}>Serve this one</button>}</td>
+                <td className="actions">{!liveOf.has(d.id) && <button className="small" onClick={() => setRollback(d.id)}>Serve this one</button>}</td>
               </tr>
             ))}
-            {manifest && rows.length === 0 && <tr><td colSpan={5} className="muted">No deployments yet.</td></tr>}
+            {manifest && rows.length === 0 && <tr><td colSpan={5} className="emptycell">No deployments yet.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -141,7 +222,7 @@ function Deployments({ name, manifest, run }: { name: string; manifest?: Manifes
   );
 }
 
-function Domains({ name, run }: { name: string; run: Run }) {
+function Domains({ name, siteHost, run }: { name: string; siteHost?: string; run: Run }) {
   const { data, error, loading } = useApi<DomainRow[]>(`/api/projects/${name}/domains`, { interval: 20000 });
   const [host, setHost] = useState('');
   const [manual, setManual] = useState(false);
@@ -160,14 +241,16 @@ function Domains({ name, run }: { name: string; run: Run }) {
                 <td><StatusBadge status={d.stack} /></td>
                 <td><StatusBadge status={d.certificate} /></td>
                 <td><StatusBadge status={d.dns} /></td>
-                <td className="row">
-                  <button className="small" onClick={() => void run({ action: 'domain-verify', host: d.host })}>Check</button>
-                  <button className="small danger" onClick={() => setRemoving(d.host)}>Remove</button>
+                <td className="actions">
+                  <div className="row">
+                    <button className="small" onClick={() => void run({ action: 'domain-verify', host: d.host })}>Check</button>
+                    <button className="small danger" onClick={() => setRemoving(d.host)}>Remove</button>
+                  </div>
                 </td>
               </tr>
             ))}
-            {data?.length === 0 && <tr><td colSpan={5} className="muted">No custom domains. This project is served at the shared CloudFront address.</td></tr>}
-            {loading && !data && <tr><td colSpan={5} className="muted">Loading...</td></tr>}
+            {data?.length === 0 && <tr><td colSpan={5} className="emptycell">No custom domains yet. {siteHost ? <>The project is served at its own address, <span className="mono">{siteHost}</span>.</> : 'The project is served at a CloudFront address.'}</td></tr>}
+            {loading && !data && <tr><td colSpan={5} className="emptycell">Loading...</td></tr>}
           </tbody>
         </table>
       </div>
@@ -230,14 +313,16 @@ function Environment({ name, run }: { name: string; run: Run }) {
                 <td className="mono">{r.name}</td>
                 <td>{r.production ? <Badge kind="ok">set</Badge> : '-'}</td>
                 <td>{r.preview ? <Badge kind="ok">set</Badge> : '-'}</td>
-                <td className="row">
-                  {r.production && <button className="small danger" onClick={() => void run({ action: 'env-rm', name: r.name })}>Remove</button>}
-                  {r.preview && <button className="small danger" onClick={() => void run({ action: 'env-rm', name: r.name, preview: true })}>Remove preview</button>}
+                <td className="actions">
+                  <div className="row">
+                    {r.production && <button className="small danger" onClick={() => void run({ action: 'env-rm', name: r.name })}>Remove</button>}
+                    {r.preview && <button className="small danger" onClick={() => void run({ action: 'env-rm', name: r.name, preview: true })}>Remove preview</button>}
+                  </div>
                 </td>
               </tr>
             ))}
-            {data?.length === 0 && <tr><td colSpan={4} className="muted">No variables yet.</td></tr>}
-            {loading && !data && <tr><td colSpan={4} className="muted">Loading...</td></tr>}
+            {data?.length === 0 && <tr><td colSpan={4} className="emptycell">No variables yet.</td></tr>}
+            {loading && !data && <tr><td colSpan={4} className="emptycell">Loading...</td></tr>}
           </tbody>
         </table>
       </div>
@@ -309,7 +394,7 @@ function Github({ name, manifest, run }: { name: string; manifest?: Manifest; ru
         <dl className="kv">
           <dt>Repository</dt><dd><a href={`https://github.com/${source.repo}`} target="_blank" rel="noreferrer">{source.repo}</a></dd>
           <dt>Branch</dt><dd>{source.branch}</dd>
-          <dt>Deploys to</dt><dd>{source.host ?? ((manifest.domains ?? []).join(', ') || 'the shared CloudFront address')}</dd>
+          <dt>Deploys to</dt><dd>{source.host ?? ((manifest.domains ?? []).join(', ') || manifest.siteHost || 'its own CloudFront address')}</dd>
           <dt>Install command</dt><dd>{source.installCommand ?? <span className="muted">detected</span>}</dd>
           <dt>Build command</dt><dd>{source.buildCommand ?? <span className="muted">detected</span>}</dd>
           <dt>Pull request previews</dt><dd>{source.previews ? 'on' : <span className="muted">off (see the Previews tab)</span>}</dd>
@@ -349,8 +434,8 @@ function Builds({ name, run }: { name: string; run: Run }): ReactNode {
                 <td><button className="small" onClick={() => void run({ action: 'build-logs', build: b.build })}>Log</button></td>
               </tr>
             ))}
-            {data?.length === 0 && <tr><td colSpan={7} className="muted">No builds in AWS yet. Local builds do not appear here.</td></tr>}
-            {loading && !data && <tr><td colSpan={7} className="muted">Loading...</td></tr>}
+            {data?.length === 0 && <tr><td colSpan={7} className="emptycell">No builds in AWS yet. Local builds do not appear here.</td></tr>}
+            {loading && !data && <tr><td colSpan={7} className="emptycell">Loading...</td></tr>}
           </tbody>
         </table>
       </div>
@@ -409,8 +494,8 @@ function Previews({ name, manifest, run }: { name: string; manifest?: Manifest; 
                 <td><button className="small danger" onClick={() => setRemoving(p.pr)}>Remove</button></td>
               </tr>
             ))}
-            {data && data.previews.length === 0 && <tr><td colSpan={5} className="muted">No open previews.</td></tr>}
-            {loading && !data && <tr><td colSpan={5} className="muted">Loading...</td></tr>}
+            {data && data.previews.length === 0 && <tr><td colSpan={5} className="emptycell">No open previews.</td></tr>}
+            {loading && !data && <tr><td colSpan={5} className="emptycell">Loading...</td></tr>}
           </tbody>
         </table>
       </div>

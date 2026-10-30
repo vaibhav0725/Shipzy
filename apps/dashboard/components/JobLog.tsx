@@ -1,16 +1,34 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { CopyButton } from '@/components/bits';
 
 type End = { status: 'succeeded' | 'failed' | 'cancelled'; exitCode: number | null };
 
+const lineClass = (l: string) =>
+  l.startsWith('$ ') ? 'cmd' : /^(Error|\[failed)/.test(l) ? 'err' : /^(Live:|Ready|Connected|Deleted|Destroyed|\[succeeded)/.test(l) ? 'ok' : /^(==>|\[Container\])/.test(l) ? 'dim' : undefined;
+
 /** Follows a job's output live (server-sent events). The server replays everything from the start on connect. */
-export default function JobLog({ jobId, onEnd }: { jobId: string; onEnd?: (end: End) => void }) {
+export default function JobLog({
+  jobId,
+  running,
+  onEnd,
+  onLines,
+}: {
+  jobId: string;
+  running?: boolean;
+  onEnd?: (end: End) => void;
+  onLines?: (lines: string[]) => void;
+}) {
   const [lines, setLines] = useState<string[]>([]);
+  const [follow, setFollow] = useState(true);
   const box = useRef<HTMLDivElement>(null);
-  const stick = useRef(true);
+  const followRef = useRef(true);
+  followRef.current = follow;
   const onEndRef = useRef(onEnd);
   onEndRef.current = onEnd;
+  const onLinesRef = useRef(onLines);
+  onLinesRef.current = onLines;
 
   useEffect(() => {
     setLines([]);
@@ -29,25 +47,39 @@ export default function JobLog({ jobId, onEnd }: { jobId: string; onEnd?: (end: 
   }, [jobId]);
 
   useEffect(() => {
+    onLinesRef.current?.(lines);
     const el = box.current;
-    if (el && stick.current) el.scrollTop = el.scrollHeight;
+    if (el && followRef.current) el.scrollTop = el.scrollHeight;
   }, [lines]);
 
   return (
-    <div
-      className="log"
-      ref={box}
-      onScroll={(e) => {
-        const el = e.currentTarget;
-        stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-      }}
-    >
-      {lines.length === 0 ? <span className="muted">Waiting for output...</span> : null}
-      {lines.map((l, i) => (
-        <div key={i} className={l.startsWith('$ ') ? 'cmd' : /^(Error|\[failed)/.test(l) ? 'err' : undefined}>
-          {l || ' '}
-        </div>
-      ))}
+    <div className="term">
+      <div className="term-bar">
+        <span className={`dot ${running ? 'pulse' : ''}`} style={{ color: running ? '#f2b653' : '#6c7586' }} />
+        <span>{running ? 'Running' : 'Output'}</span>
+        <span className="spacer" />
+        <button type="button" onClick={() => setFollow((f) => !f)} aria-pressed={follow}>
+          {follow ? 'Following' : 'Follow'}
+        </button>
+        <CopyButton text={lines.join('\n')} label="Copy log" />
+      </div>
+      <div
+        className="log"
+        ref={box}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+          if (!atEnd && followRef.current) setFollow(false);
+          if (atEnd && !followRef.current) setFollow(true);
+        }}
+      >
+        {lines.length === 0 ? <span className="dim">Waiting for output...</span> : null}
+        {lines.map((l, i) => (
+          <div key={i} className={lineClass(l)}>
+            {l || ' '}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

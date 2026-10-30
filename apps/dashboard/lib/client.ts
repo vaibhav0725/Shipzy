@@ -24,6 +24,7 @@ export interface Manifest {
   env?: { production: string[]; preview: string[] };
   domains?: string[];
   siteHost?: string;
+  previews?: Record<string, unknown>;
 }
 export interface Status {
   account: string;

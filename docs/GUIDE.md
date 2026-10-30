@@ -475,8 +475,8 @@ before `dashboard`). Press Ctrl-C in the terminal to stop it.
 
 | Screen | What you do there |
 |---|---|
-| Overview | Account, stack, totals, last build. If the stack does not exist it tells you to run `deployer init` |
-| Projects | Every project: where it is live, age, auto-deploy source, versions, size |
+| Overview | Totals, your most recent projects as cards, the last build and the infrastructure. If the stack does not exist it tells you to run `deployer init` |
+| Projects | A card per project (live address, repository, last deploy, versions, size), with search once there are more than three |
 | New deployment | Deploy from **a folder on this computer** (type or browse to it; build here or in AWS) or from **a GitHub repository** (pick from your repositories after **Connect GitHub**, or paste a link; token from the login, pasted, or the stored one) |
 | Project: Deployments | History with live badges, "Serve this one" (rollback), preview and run cleanup, delete the project |
 | Project: Domains | Add (progress shown live), check and remove custom domains |
@@ -484,6 +484,9 @@ before `dashboard`). Press Ctrl-C in the terminal to stop it.
 | Project: GitHub | The connection, "build the current head now", disconnect |
 | Project: Builds | Recent builds in AWS and their logs |
 | Activity | Everything started from the dashboard, with its full output |
+
+**Look and feel.** The sidebar has a theme switch (match system, light, dark), remembered in that browser only. A project
+page can be opened on a given tab with `?tab=domains` (also `environment`, `github`, `previews`, `builds`).
 
 **Installing it (optional).** The dashboard is not part of the small CLI install. The first time you run
 `deployer dashboard` it says so and asks `Download and install it now? [y/N]`. Answer `n` and nothing is downloaded
