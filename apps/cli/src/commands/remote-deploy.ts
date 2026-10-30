@@ -6,6 +6,7 @@ import { projectBuildEnv } from '../lib/build-env.js';
 import { detectFramework } from '../lib/build.js';
 import { formatBytes } from '../lib/format.js';
 import { parseKeep, resolveProject } from '../lib/project.js';
+import { ensureProjectSite } from '../lib/sites.js';
 import { zipSource } from '../lib/source-zip.js';
 import { watchBuild } from '../lib/watch.js';
 import type { DeployOptions } from './deploy.js';
@@ -23,7 +24,8 @@ export async function remoteDeploy(dirArg: string, opts: DeployOptions, global: 
     throw new Error('This stack has no build support yet. Run `deployer init` to add it.');
   }
   const explicit = opts.host ? [opts.host.toLowerCase()] : undefined;
-  const hosts = await resolveTargetHosts(out, project, (await readManifest(out.bucket, project)).domains, out.domain, explicit);
+  await ensureProjectSite(out, global, project, explicit);
+  const hosts = await resolveTargetHosts(out, project, await readManifest(out.bucket, project), out.domain, explicit);
 
   const env = await projectBuildEnv(out.bucket, global.stackName, project);
   const { zip, files, skippedEnvFiles } = zipSource(dir);

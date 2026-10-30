@@ -21,25 +21,6 @@ type Body = Record<string, unknown>;
 /** `--flag=value`, so the value can never be read as a separate option. */
 const withValue = (flag: string, value: string | undefined): string[] => (value === undefined ? [] : [`${flag}=${value}`]);
 
-interface ProjectInfo {
-  domains?: string[];
-}
-
-/**
- * Where a deploy lands when no host is given: the project's custom domains if it has any, otherwise the shared
- * CloudFront address, which replaces whatever is live there. That last case must be agreed to explicitly.
- */
-async function requireExplicitTarget(project: string, hostGiven: boolean, accepted: boolean): Promise<void> {
-  if (hostGiven) return;
-  const info = await runJson<ProjectInfo>(['list', '-p', project, '--json'], 0);
-  if ((info.domains ?? []).length > 0) return;
-  if (!accepted) {
-    throw new InputError(
-      'Choose where to serve this project: give a hostname, or confirm that it may replace whatever is live at the shared CloudFront address.',
-    );
-  }
-}
-
 export async function planAction(body: Body): Promise<ActionPlan> {
   const action = body.action;
   switch (action) {
@@ -54,7 +35,6 @@ export async function planAction(body: Body): Promise<ActionPlan> {
       if (!stat?.isDirectory()) throw new InputError(`"${dir}" is not a folder on this machine.`);
       const project = v.project(body.project);
       const host = body.host ? v.host(body.host) : undefined;
-      await requireExplicitTarget(project, Boolean(host), v.flag(body.acceptSharedUrl));
       const remote = v.flag(body.remote);
       const keep = v.keep(body.keep);
       return {
@@ -84,7 +64,6 @@ export async function planAction(body: Body): Promise<ActionPlan> {
       const parsed = v.repoInput(body.repo);
       const branch = body.branch ? v.branch(body.branch) : parsed.branch;
       const host = body.host ? v.host(body.host) : undefined;
-      await requireExplicitTarget(project, Boolean(host), v.flag(body.acceptSharedUrl));
       return {
         label: `Deploy ${parsed.repo} as ${project}`,
         project,
@@ -119,7 +98,6 @@ export async function planAction(body: Body): Promise<ActionPlan> {
       if (useLogin && !token) throw new InputError('Your GitHub login has ended. Connect GitHub again.');
       if (!reuse && !token) throw new InputError('Enter a GitHub token, or choose the token already stored in your account.');
       if (token && (token.length > 600 || /\s/.test(token))) throw new InputError('That does not look like a GitHub token.');
-      await requireExplicitTarget(project, Boolean(host), v.flag(body.acceptSharedUrl));
       return {
         label: `Connect ${project} to ${repo} and deploy`,
         project,

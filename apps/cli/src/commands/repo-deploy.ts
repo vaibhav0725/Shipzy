@@ -15,6 +15,7 @@ import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { projectBuildEnv } from '../lib/build-env.js';
 import { parseKeep } from '../lib/project.js';
 import { getSecret } from '../lib/secrets.js';
+import { ensureProjectSite } from '../lib/sites.js';
 import { watchBuild } from '../lib/watch.js';
 import type { DeployOptions } from './deploy.js';
 
@@ -66,9 +67,10 @@ export async function repoDeploy(input: string, opts: DeployOptions & { branch?:
   }
   console.log(`Building ${repo.full_name}@${sha.slice(0, 7)} (${branch}) as "${project}"${repo.private ? '' : ' - public repository, no token used'}`);
 
-  const manifest = await readManifest(out.bucket, project);
   const explicit = opts.host ? [opts.host.toLowerCase()] : undefined;
-  const hosts = await resolveTargetHosts(out, project, manifest.domains, out.domain, explicit);
+  await ensureProjectSite(out, global, project, explicit);
+  const manifest = await readManifest(out.bucket, project);
+  const hosts = await resolveTargetHosts(out, project, manifest, out.domain, explicit);
   const buildId = await startBuild(out.buildProject, {
     project,
     id: newDeploymentId(),

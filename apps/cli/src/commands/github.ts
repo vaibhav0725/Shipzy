@@ -21,6 +21,7 @@ import { projectBuildEnv } from '../lib/build-env.js';
 import { promptHidden } from '../lib/prompt.js';
 import { getSecret, putSecret } from '../lib/secrets.js';
 import { removeRepoWebhook } from '../lib/webhooks.js';
+import { ensureProjectSite } from '../lib/sites.js';
 import { watchBuild } from '../lib/watch.js';
 
 interface GithubStack {
@@ -115,8 +116,11 @@ export async function connect(opts: ConnectOptions, global: GlobalOptions): Prom
     };
   });
 
+  // Without a host or domain the project is served at an address of its own; create it now so pushes have somewhere to go.
+  const siteHost = await ensureProjectSite(out, global, opts.project, host ? [host] : undefined);
+
   console.log(`\nConnected ${opts.project} to ${repo.full_name} (${branch}): ${webhookNote}.`);
-  console.log(`Every push to ${branch} now builds and deploys to ${host ?? out.domain}.`);
+  console.log(`Every push to ${branch} now builds and deploys to ${host ?? siteHost ?? out.domain}.`);
   if (opts.previews) {
     console.log(`Every pull request into ${branch} now gets its own preview URL, removed when the pull request closes.`);
     console.log('The GitHub token needs "Pull requests: Read and write" for the preview comment (fine-grained token) or the repo scope (classic).');
@@ -137,6 +141,8 @@ export async function githubDeploy(opts: { project: string; detach?: boolean }, 
     throw new Error(`"${opts.project}" is not connected to GitHub. Run: deployer github connect -p ${opts.project} --repo owner/name`);
   }
 
+  const explicit = source.host ? [source.host] : undefined;
+  await ensureProjectSite(out, global, opts.project, explicit);
   const token = await getSecret(stack.githubTokenSecretArn);
   let sha: string;
   try {
@@ -149,14 +155,14 @@ export async function githubDeploy(opts: { project: string; detach?: boolean }, 
   const buildId = await startBuild(stack.buildProject, {
     project: opts.project,
     id: newDeploymentId(),
-    hosts: source.host ? [source.host] : undefined,
+    hosts: explicit,
     keep: DEFAULT_KEEP,
     source: { type: 'github', repo: source.repo, sha },
     installCommand: source.installCommand,
     buildCommand: source.buildCommand,
     env: await projectBuildEnv(out.bucket, global.stackName, opts.project),
   });
-  const hosts = await resolveTargetHosts(out, opts.project, manifest.domains, out.domain, source.host ? [source.host] : undefined);
+  const hosts = await resolveTargetHosts(out, opts.project, await readManifest(out.bucket, opts.project), out.domain, explicit);
   await watchBuild(buildId, hosts, opts.project, Boolean(opts.detach));
 }
 

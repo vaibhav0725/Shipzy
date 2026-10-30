@@ -14,6 +14,7 @@ import {
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { build } from '../lib/build.js';
 import { parseKeep, resolveProject } from '../lib/project.js';
+import { ensureProjectSite } from '../lib/sites.js';
 import { uploadDirectory } from '../lib/upload.js';
 import { remoteDeploy } from './remote-deploy.js';
 
@@ -38,13 +39,9 @@ export async function deploy(dirArg: string, opts: DeployOptions, global: Global
   const project = resolveProject(dir, opts.project);
 
   const out = await getOutputs(global.stackName);
-  const hosts = await resolveTargetHosts(
-    out,
-    project,
-    (await readManifest(out.bucket, project)).domains,
-    out.domain,
-    opts.host ? [opts.host] : undefined,
-  );
+  const explicit = opts.host ? [opts.host] : undefined;
+  await ensureProjectSite(out, global, project, explicit);
+  const hosts = await resolveTargetHosts(out, project, await readManifest(out.bucket, project), out.domain, explicit);
 
   const { outDir, framework } = await build(dir, {
     skipBuild: opts.skipBuild ?? false,

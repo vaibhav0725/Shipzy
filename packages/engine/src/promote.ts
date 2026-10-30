@@ -70,7 +70,7 @@ async function promoteProduction(event: PromoteEvent) {
   const hosts = await resolveTargetHosts(
     site,
     event.project,
-    (await readManifest(site.bucket, event.project)).domains,
+    await readManifest(site.bucket, event.project),
     env('DEFAULT_HOST'),
     explicit,
   );

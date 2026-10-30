@@ -23,6 +23,7 @@ export interface Manifest {
   source?: { type: 'github'; repo: string; branch: string; host?: string; installCommand?: string; buildCommand?: string; previews?: boolean };
   env?: { production: string[]; preview: string[] };
   domains?: string[];
+  siteHost?: string;
 }
 export interface Status {
   account: string;

@@ -49,6 +49,8 @@ export interface Manifest {
   env?: ManifestEnv;
   /** custom domains this project is served on (each has its own distribution; see `deployer domain`) */
   domains?: string[];
+  /** the project's own CloudFront address ("dxxxx.cloudfront.net"), created the first time it is deployed without a domain */
+  siteHost?: string;
   /** open pull requests that have a preview, by pull request number */
   previews?: Record<string, PreviewInfo>;
 }

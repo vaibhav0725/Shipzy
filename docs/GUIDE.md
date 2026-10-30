@@ -148,6 +148,7 @@ of truth for what can be rolled back to.
 **Domains**
 - Your own hostnames with HTTPS (`domain add`): certificate, CloudFront distribution and, if the domain is in Route 53,
   the DNS records, all created for you. Any other DNS provider works too (you add the printed records).
+- Every project gets its own CloudFront address automatically; any number of projects are live at once.
 - Several projects side by side, each on its own hostname; one project on several hostnames.
 
 **Dashboard**
@@ -355,8 +356,8 @@ deployer env rm -p my-app VITE_API_URL
 
 ### 5.5 Custom domains
 
-By default every project is served at the stack's CloudFront URL, so the **last project deployed there wins**. Give each
-project its own hostname instead:
+Every project already gets an address of its own (see "Your project's own address" below). A custom domain puts it on
+a name you own, with HTTPS:
 
 ```sh
 deployer domain add app.example.com -p my-app     # certificate + distribution + DNS (about 5 to 15 minutes)
@@ -377,9 +378,23 @@ deployer domain rm app.example.com                # remove it completely (asks t
    the main stack's router, routing table and bucket access. Your main distribution is never touched.
 4. Records the hostname on the project and routes it to the project's live deployment.
 
-**Which hosts does a deploy update?** `--host` if you pass it; otherwise all of the project's domains; otherwise the
-CloudFront URL. A project with domains keeps updating the CloudFront URL only while it already owns that route, so a
-project never takes over another project's default URL by accident. Rollback moves the same set together.
+**Which hosts does a deploy update?** `--host` if you pass it; otherwise all of the project's domains plus its own
+CloudFront address; otherwise just the address. Rollback moves the same set together.
+
+#### Your project's own address
+
+The first time a project is deployed with no `--host` and no custom domain, `deployer` creates a small CloudFront
+distribution for it (about 5 minutes, once) and records its address, like `https://d1abc2def3ghij.cloudfront.net`.
+Every later deploy of that project, from your machine, from AWS or from a push, updates that same address, and
+other projects have theirs, so any number of projects can be live at once.
+
+- It is the same kind of stack as a custom domain, named `<stack>-site-<project>`; it reuses the main stack's router,
+  routing table and bucket access. `deployer delete` removes it with the project, and `destroy` removes all of them.
+- The name is chosen by CloudFront, not by you. For a readable address add a custom domain.
+- The stack's own **default URL** (printed by `init`) is no longer where projects land. A project that already holds
+  it from before keeps using it; to move such a project to an address of its own, delete and redeploy it, or pass
+  `--host` to say where it should go. Nothing is ever replaced behind your back.
+- Each address is one distribution, so projects count against your account's CloudFront quota, like domains do.
 
 **Using a domain you own elsewhere (GoDaddy, Namecheap and so on).** Pick a subdomain and **delegate** it to Route 53
 so the whole thing is automatic:
@@ -458,7 +473,7 @@ before `dashboard`). Press Ctrl-C in the terminal to stop it.
 
 | Screen | What you do there |
 |---|---|
-| Overview | Account, stack, shared URL, totals, last build. If the stack does not exist it tells you to run `deployer init` |
+| Overview | Account, stack, totals, last build. If the stack does not exist it tells you to run `deployer init` |
 | Projects | Every project: where it is live, age, auto-deploy source, versions, size |
 | New deployment | Deploy from **a folder on this computer** (type or browse to it; build here or in AWS) or from **a GitHub repository** (pick from your repositories after **Connect GitHub**, or paste a link; token from the login, pasted, or the stored one) |
 | Project: Deployments | History with live badges, "Serve this one" (rollback), preview and run cleanup, delete the project |
@@ -483,8 +498,7 @@ in AWS keeps running there).
 - Secrets (a GitHub token, a variable's value) travel through the environment or standard input, never on a command
   line, and are blanked out of job logs. No page or API ever returns them. Child processes do not receive the
   dashboard's own token.
-- Deploying without a hostname to a project that has no domains asks you to agree that it **replaces whatever is
-  live at the shared CloudFront address**.
+- Deploying without a hostname gives the project an address of its own; it never replaces another project.
 - Cancelling a job stops the local process. If the build had already started in AWS, it finishes anyway.
 
 #### Connect GitHub (sign in instead of pasting a token)
@@ -672,6 +686,7 @@ or, outside a git repository, a directory walk using the root `.gitignore`. Thes
 | Lambda "webhook" + Function URL | Receives GitHub push events |
 | Secrets Manager: webhook secret, GitHub token | Signing secret and the token used to clone |
 | Parameter Store (SecureString), created on demand | Your projects' build-time environment variables, under `/deployer/<stack>/…` |
+| Per project, created by its first deploy: a CloudFormation stack `<stack>-site-<project>` with one CloudFront distribution (the project's own `dxxxx.cloudfront.net` address) | One project's address |
 | Per custom domain, created by `domain add`: a CloudFormation stack `<stack>-domain-<host>` with one CloudFront distribution, an ACM certificate (`us-east-1`), and Route 53 records if you have a zone | One hostname with HTTPS |
 | 3 CloudWatch log groups | Kept for 14 days |
 | 3 IAM roles (+ policies) | See below |
@@ -717,8 +732,8 @@ settings keep S3 storage bounded.
 
 ## 10. Limits and known issues
 
-- **The CloudFront URL is one shared address**: the last project deployed to it wins. Give each project a custom
-  domain (section 5.5) to avoid that.
+- **A new project's first deploy takes about 5 minutes longer** while CloudFront creates its address. Later deploys do not.
+- **Project addresses are random CloudFront names** (`dxxxx.cloudfront.net`). Add a custom domain (section 5.5) for a readable one.
 - **Preview comments need a token with pull request access.** Without it the preview still works; only the comment is missing (see the engine's log).
 - **Custom domains are one distribution each**, so they count against your account's CloudFront quota. The only
   wildcard domain is the one for previews (`--preview`).

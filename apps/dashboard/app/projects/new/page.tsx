@@ -35,7 +35,6 @@ export default function NewDeployment() {
   const [host, setHost] = useState('');
   const [install, setInstall] = useState('');
   const [build, setBuild] = useState('');
-  const [accept, setAccept] = useState(false);
   const [picking, setPicking] = useState(false);
   const [existing, setExisting] = useState<Manifest>();
   const [error, setError] = useState<string>();
@@ -98,7 +97,6 @@ export default function NewDeployment() {
   // With a GitHub login the token comes from that login, unless the stored one is chosen.
   const useLogin = loggedIn && !reuse;
   const domains = existing?.domains ?? [];
-  const needsAccept = !host.trim() && domains.length === 0;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -110,7 +108,6 @@ export default function NewDeployment() {
         host: host.trim() || undefined,
         installCommand: install.trim() || undefined,
         buildCommand: build.trim() || undefined,
-        acceptSharedUrl: accept,
       };
       const job =
         source === 'folder'
@@ -249,19 +246,11 @@ export default function NewDeployment() {
             <small>
               {domains.length > 0
                 ? 'Leave empty to update this project\'s domains.'
-                : 'Leave empty to use the shared CloudFront address. Add a custom domain to the project afterwards from its Domains tab.'}
+                : existing?.siteHost
+                  ? `Leave empty to update this project's own address, ${existing.siteHost}.`
+                  : 'Leave empty and the project gets an address of its own (a CloudFront link, created on its first deploy; that takes about 5 minutes once). Add a custom domain afterwards from its Domains tab.'}
             </small>
           </label>
-
-          {needsAccept && (
-            <label className="check">
-              <input type="checkbox" checked={accept} onChange={(e) => setAccept(e.target.checked)} />
-              <span>
-                <strong>Serve at the shared CloudFront address.</strong> It holds one project at a time, so this replaces whatever is live
-                there now.
-              </span>
-            </label>
-          )}
 
           <details>
             <summary className="muted">Advanced: install and build commands</summary>
@@ -279,7 +268,7 @@ export default function NewDeployment() {
         </div>
 
         <ErrorNotice message={error} />
-        <button className="primary" disabled={busy || !NAME_RE.test(project) || (needsAccept && !accept)}>
+        <button className="primary" disabled={busy || !NAME_RE.test(project)}>
           {busy ? 'Starting...' : source === 'github' && mode === 'auto' ? 'Connect and deploy' : 'Deploy'}
         </button>
       </form>

@@ -7,6 +7,7 @@ import { cloudFormation, errorMessage, findStack, GlobalOptions, readOutputs } f
 import { confirmByTyping } from '../lib/prompt.js';
 import { deleteParamsUnder } from '../lib/ssm.js';
 import { listDomainStacks, removeDomain } from '../lib/domains.js';
+import { listSiteStacks, removeProjectSite } from '../lib/sites.js';
 import { removeRepoWebhook } from '../lib/webhooks.js';
 
 export async function destroy(opts: { yes?: boolean }, global: GlobalOptions): Promise<void> {
@@ -30,6 +31,16 @@ export async function destroy(opts: { yes?: boolean }, global: GlobalOptions): P
   // Each one is tried even if another fails. The stack itself is only deleted once none are left: a domain's
   // distribution uses this stack's router and access control, so deleting the stack first would fail.
   const failed: string[] = [];
+  // Project addresses are the same kind of stack (a distribution in front of this stack's bucket and router).
+  for (const s of await listSiteStacks(global.stackName)) {
+    console.log(`Removing the address of ${s.project}...`);
+    try {
+      await removeProjectSite(global, s.project);
+    } catch (err) {
+      failed.push(`the address of ${s.project}`);
+      console.warn(`  Could not remove it (${errorMessage(err)}).`);
+    }
+  }
   for (const d of await listDomainStacks(global.stackName)) {
     console.log(`Removing domain ${d.host}...`);
     try {
@@ -42,7 +53,7 @@ export async function destroy(opts: { yes?: boolean }, global: GlobalOptions): P
   if (failed.length > 0) {
     throw new Error(
       `Stopped before deleting the stack: ${failed.join(', ')} could not be removed. ` +
-        `Nothing else was deleted. Run \`deployer domain rm <host>\` for each, then \`deployer destroy\` again.`,
+        `Nothing else was deleted. Fix the cause, then run \`deployer destroy\` again (for a domain, \`deployer domain rm <host>\` also works).`,
     );
   }
 

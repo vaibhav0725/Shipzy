@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import * as cdk from 'aws-cdk-lib';
 import { DeployerStack } from './deployer-stack';
 import { DomainStack } from './domain-stack';
+import { SiteStack } from './site-stack';
 
 // The stack has no file assets, so it needs no `cdk bootstrap`: we synthesize a
 // plain CloudFormation template that the CLI deploys directly.
@@ -27,3 +28,11 @@ const domainStack = new DomainStack(domainApp, 'DeployerDomain', {
 });
 const domainTemplate = domainApp.synth().getStackByName(domainStack.stackName).template;
 fs.writeFileSync(path.resolve(path.dirname(out), 'domain-template.json'), JSON.stringify(domainTemplate) + '\n');
+
+// One project address = one small stack of its own; the CLI fills in the parameters.
+const siteApp = new cdk.App({ analyticsReporting: false });
+const siteStack = new SiteStack(siteApp, 'DeployerSite', {
+  synthesizer: new cdk.DefaultStackSynthesizer({ generateBootstrapVersionRule: false }),
+});
+const siteTemplate = siteApp.synth().getStackByName(siteStack.stackName).template;
+fs.writeFileSync(path.resolve(path.dirname(out), 'site-template.json'), JSON.stringify(siteTemplate) + '\n');
