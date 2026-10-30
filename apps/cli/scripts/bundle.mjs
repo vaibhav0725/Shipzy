@@ -8,6 +8,8 @@ import { build } from 'esbuild';
 const pkgDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outfile = path.join(pkgDir, 'dist/deployer.mjs');
 const { version } = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8'));
+// The optional dashboard package that `deployer dashboard` installs on demand.
+const dashboardPackage = JSON.parse(fs.readFileSync(path.join(pkgDir, '../dashboard/package.json'), 'utf8')).name;
 
 await build({
   entryPoints: [path.join(pkgDir, 'src/index.ts')],
@@ -16,7 +18,7 @@ await build({
   platform: 'node',
   target: 'node20',
   format: 'esm',
-  define: { __DEPLOYER_VERSION__: JSON.stringify(version) },
+  define: { __DEPLOYER_VERSION__: JSON.stringify(version), __DASHBOARD_PACKAGE__: JSON.stringify(dashboardPackage) },
   // Some bundled dependencies use require(); give them one.
   banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" },
   legalComments: 'none',

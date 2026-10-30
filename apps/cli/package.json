@@ -8,7 +8,8 @@
   },
   "files": [
     "dist/deployer.mjs",
-    "assets"
+    "assets",
+    "!assets/dashboard"
   ],
   "scripts": {
     "typecheck": "tsc -p . --noEmit",

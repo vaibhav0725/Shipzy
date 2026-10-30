@@ -3,13 +3,15 @@ import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
-import { assetPath } from '../lib/assets.js';
 import { GlobalOptions } from '../lib/aws.js';
+import { ensureDashboard } from '../lib/dashboard-app.js';
 
 export interface DashboardOptions {
   port: string;
   /** commander turns --no-open into open: false */
   open: boolean;
+  /** download (or update) the optional dashboard package first, without asking */
+  install?: boolean;
 }
 
 function canListen(port: number): Promise<boolean> {
@@ -51,15 +53,12 @@ function openBrowser(url: string): void {
   }
 }
 
-/** Runs the dashboard (a Next.js server shipped with the CLI) on this machine, for this machine only. */
+/** Runs the dashboard (an optional package, installed on demand) on this machine, for this machine only. */
 export async function dashboard(opts: DashboardOptions, global: GlobalOptions): Promise<void> {
   const port = Number(opts.port);
   if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('--port must be a number from 1024 to 65535.');
 
-  const server = path.join(assetPath('dashboard'), 'apps/dashboard/server.js');
-  if (!fs.existsSync(server)) {
-    throw new Error('The dashboard is not part of this build of the CLI. Run `npm run build` in the repository first.');
-  }
+  const server = await ensureDashboard(Boolean(opts.install));
   if (!(await canListen(port))) throw new Error(`Port ${port} is already in use. Pick another with --port.`);
 
   const token = randomBytes(24).toString('base64url');

@@ -197,10 +197,12 @@ deployer --version
 `npm link` makes `deployer` available from any directory, and rebuilding with `npm run build` updates it. To remove it,
 run `npm unlink -g @deployer/cli`. Inside the repository you can also run it as `npm run deployer -- <command>`.
 
-**Installing without the repository.** `npm pack` in `apps/cli` produces a ~0.8 MB tarball that installs with
+**Installing without the repository.** `npm pack` in `apps/cli` produces a ~0.9 MB tarball that installs with
 `npm install -g <tarball>` and has no dependencies: the CLI, the stack template, the Lambda code and the build script
-are all inside it. It has been tested from a clean install. The package is marked `private` for now, because the final
-package name has not been chosen; once it is, removing that flag and running `npm publish` makes
+are all inside it. The local dashboard is **not** in it: it is a separate, optional package (~16 MB download, ~50 MB
+installed) that `deployer dashboard` offers to download the first time you ask for it (see section 5.10). Both have been
+tested from a clean install. The packages are marked `private` for now, because the final package name has not been
+chosen; once it is, removing that flag and running `npm publish` for each (section 12) makes
 `npm install -g <name>` work for anyone.
 
 #### Least-privilege access (recommended)
@@ -483,7 +485,15 @@ before `dashboard`). Press Ctrl-C in the terminal to stop it.
 | Project: Builds | Recent builds in AWS and their logs |
 | Activity | Everything started from the dashboard, with its full output |
 
-**How it works.** The dashboard is a Next.js app shipped inside the CLI package. Reading data and every action run the
+**Installing it (optional).** The dashboard is not part of the small CLI install. The first time you run
+`deployer dashboard` it says so and asks `Download and install it now? [y/N]`. Answer `n` and nothing is downloaded
+(the CLI works fully without it). Answer `y`, or run `deployer dashboard --install` yourself, and the matching version
+is installed into `~/.deployer/dashboard-app` with npm; later runs just start it. When the CLI is updated the dashboard
+is out of date until you run `deployer dashboard --install` again. Without a terminal (a script, CI) it prints the
+command instead of asking. Remove it with `rm -rf ~/.deployer/dashboard-app`. Running from this repository, the build
+already includes it and nothing is asked.
+
+**How it works.** The dashboard is a Next.js app, a separate package from the CLI. Reading data and every action run the
 `deployer` command itself (with `--json` for reads), so behaviour is identical to the terminal and nothing is
 re-implemented. Actions run as background jobs; their output streams to the browser live and is kept in memory while
 the dashboard runs. Closing the browser tab does not stop a job; stopping the dashboard does (a build already started
@@ -607,6 +617,9 @@ Removes GitHub webhooks, empties both buckets and deletes the stack. `-y, --yes`
 |---|---|
 | `--port <number>` | Port to listen on (default 4173; `127.0.0.1` only) |
 | `--no-open` | Print the address without opening the browser |
+| `--install` | Download or update the optional dashboard package first, without asking (installed in `~/.deployer/dashboard-app`) |
+
+If the dashboard is not installed, the command asks whether to download it (or prints how, without a terminal).
 
 ### `domain add`, `ls`, `verify`, `rm`
 | Command | Options | What it does |
@@ -797,6 +810,16 @@ The code is TypeScript in npm workspaces. `npm run build` runs, in order: `core`
 The CLI ships the template, engine zip and build script as assets, and `init` uploads them. That is why the stack
 needs no `cdk bootstrap`. The published package has no runtime dependencies: AWS request signing for the routing
 table uses a pure-JavaScript implementation, so nothing native is installed or shipped to Lambda.
+
+**Publishing (two packages).** Both are built by `npm run build`.
+- The CLI: `npm pack -w apps/cli` (~0.9 MB: the bundled `dist/deployer.mjs` plus the template, engine zip and build
+  script; `assets/dashboard` is excluded).
+- The dashboard: `cd apps/dashboard/dist-package && npm pack` (~16 MB). It is the Next.js standalone server with every
+  `node_modules` folder renamed `_nm`, because npm never packs a folder with that name; the CLI renames them back when
+  it installs the package. Its version must equal the CLI's.
+- Both are `private` until a package name is chosen. The CLI finds the dashboard package's name from
+  `apps/dashboard/package.json`, so renaming it there is enough. To test an install before publishing, set
+  `DEPLOYER_DASHBOARD_PACKAGE=<path to the tarball>`.
 
 **Conventions worth knowing**
 
