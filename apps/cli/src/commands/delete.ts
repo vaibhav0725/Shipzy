@@ -9,6 +9,8 @@ import {
   listManifestProjects,
   listRoutes,
   readManifest,
+  readPreviewBases,
+  isPreviewHost,
 } from '@deployer/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { confirmByTyping } from '../lib/prompt.js';
@@ -27,11 +29,12 @@ export async function deleteProject(opts: DeleteOptions, global: GlobalOptions):
   assertProjectName(project);
   const out = await getOutputs(global.stackName);
 
-  const [manifest, folders, allRoutes, known] = await Promise.all([
+  const [manifest, folders, allRoutes, known, bases] = await Promise.all([
     readManifest(out.bucket, project),
     listDeploymentIds(out.bucket, project),
     listRoutes(out.kvsArn),
     listManifestProjects(out.bucket),
+    readPreviewBases(out.bucket),
   ]);
   const routes = allRoutes.filter((r) => r.target.startsWith(`${project}/`));
 
@@ -41,7 +44,9 @@ export async function deleteProject(opts: DeleteOptions, global: GlobalOptions):
   }
 
   console.log(`Project "${project}": ${folders.length} deployment folder${folders.length === 1 ? '' : 's'} in S3.`);
-  for (const r of routes) console.log(`  live on ${r.host}: this site will start returning 404`);
+  for (const r of routes) {
+    console.log(isPreviewHost(r.host, bases) ? `  pull request preview ${r.host}: will be removed` : `  live on ${r.host}: this site will start returning 404`);
+  }
   if (routes.length === 0) console.log('  not live anywhere, so no site is affected');
   const envCount = (manifest.env?.production.length ?? 0) + (manifest.env?.preview.length ?? 0);
   if (envCount > 0) console.log(`  ${envCount} environment variable${envCount === 1 ? '' : 's'} will be deleted`);

@@ -24,8 +24,13 @@ export async function list(opts: ListOptions, global: GlobalOptions): Promise<vo
       p.source ? `${p.source.repo}@${p.source.branch}` : '-',
       String(p.versions),
       formatBytes(p.bytes),
+      [
+        p.domains.length ? `${p.domains.length} domain${p.domains.length === 1 ? '' : 's'}` : '',
+        p.envVars ? `${p.envVars} variable${p.envVars === 1 ? '' : 's'}` : '',
+        p.source?.previews ? `previews on${p.previews ? ` (${p.previews} open)` : ''}` : '',
+      ].filter(Boolean).join(', ') || '-',
     ]);
-    console.log(table(['PROJECT', 'LIVE ON', 'LIVE DEPLOYMENT', 'DEPLOYED', 'AUTO-DEPLOY FROM', 'VERSIONS', 'SIZE'], rows));
+    console.log(table(['PROJECT', 'LIVE ON', 'LIVE DEPLOYMENT', 'DEPLOYED', 'AUTO-DEPLOY FROM', 'VERSIONS', 'SIZE', 'NOTES'], rows));
     console.log('\nDetails: deployer list -p <project>');
     return;
   }

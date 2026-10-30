@@ -19,6 +19,10 @@ export interface ProjectSummary {
   source?: { repo: string; branch: string; previews: boolean };
   /** open pull requests with a live preview */
   previews: number;
+  /** custom domains of the project */
+  domains: string[];
+  /** build-time variables (production and preview-only names, counted once each) */
+  envVars: number;
 }
 
 export async function listProjects(out: StackOutputs): Promise<ProjectSummary[]> {
@@ -52,6 +56,8 @@ export async function listProjects(out: StackOutputs): Promise<ProjectSummary[]>
           ? { repo: manifest.source.repo, branch: manifest.source.branch, previews: Boolean(manifest.source.previews) }
           : undefined,
         previews: Object.keys(manifest.previews ?? {}).length,
+        domains: manifest.domains ?? [],
+        envVars: new Set([...(manifest.env?.production ?? []), ...(manifest.env?.preview ?? [])]).size,
       };
     }),
   );

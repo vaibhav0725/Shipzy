@@ -1,15 +1,17 @@
 import { engineKeyOf, findStack, GlobalOptions, readOutputs, whoAmI } from '../lib/aws.js';
 import { duration, envOf, recentBuilds } from '../lib/builds.js';
 import { formatBytes, timeAgo } from '../lib/format.js';
+import { readPreviewBases } from '@deployer/core';
 import { listProjects } from '../lib/projects.js';
 
 export async function status(opts: { json?: boolean }, global: GlobalOptions): Promise<void> {
   const [me, stack] = await Promise.all([whoAmI(), findStack(global.stackName)]);
   if (!stack) throw new Error(`Stack "${global.stackName}" not found. Run \`deployer init\` first.`);
   const out = readOutputs(stack);
-  const [projects, [lastBuild]] = await Promise.all([
+  const [projects, [lastBuild], previewDomains] = await Promise.all([
     listProjects(out),
     out.buildProject ? recentBuilds(out.buildProject, 1) : Promise.resolve([]),
+    readPreviewBases(out.bucket),
   ]);
 
   const summary = {
@@ -28,6 +30,10 @@ export async function status(opts: { json?: boolean }, global: GlobalOptions): P
         : undefined,
     },
     githubProjects: projects.filter((p) => p.source).length,
+    domains: projects.reduce((n, p) => n + p.domains.length, 0),
+    previewDomains,
+    openPreviews: projects.reduce((n, p) => n + p.previews, 0),
+    envVars: projects.reduce((n, p) => n + p.envVars, 0),
     projects: projects.length,
     deployments: projects.reduce((n, p) => n + p.versions, 0),
     liveSites: projects.reduce((n, p) => n + p.live.length, 0),
@@ -50,6 +56,8 @@ export async function status(opts: { json?: boolean }, global: GlobalOptions): P
         ? `${summary.builds.last.status}  ${summary.builds.last.project ?? '-'}  ${timeAgo(summary.builds.last.startedAt?.toISOString())}  (${summary.builds.last.took})`
         : 'none yet',
     ],
+    ['Domains', `${summary.domains} custom${summary.previewDomains.length ? `; previews on ${summary.previewDomains.map((d) => `*.${d}`).join(', ')} (${summary.openPreviews} open)` : ''}`],
+    ['Variables', `${summary.envVars} build-time variable${summary.envVars === 1 ? '' : 's'} across projects`],
     ['Projects', `${summary.projects} (${summary.liveSites} live)`],
     ['Deployments', `${summary.deployments} stored, ${formatBytes(summary.bytes)}`],
   ];

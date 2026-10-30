@@ -134,39 +134,47 @@ export async function removeDomain(out: StackOutputs, global: GlobalOptions, hos
   const distributionDomain = stack ? outputsOf(stack)['DistributionDomain'] : undefined;
   const certArn = (stack && paramsOf(stack)['CertificateArn']) || (await findCertificate(host));
 
-  if (host.startsWith('*.')) {
-    // A preview domain: every preview served on it goes first, then its place in the list of preview domains.
-    const base = host.slice(2);
-    for (const project of await listManifestProjects(out.bucket)) {
-      const { previews } = await readManifest(out.bucket, project);
-      for (const [pr, info] of Object.entries(previews ?? {})) {
-        if (isPreviewHost(info.host, [base]) && (await removePreview(out, project, Number(pr)))) {
-          notes.push(`Removed the preview of ${project} #${pr}.`);
+  // The routing table and history files live in the stack's own storage. When a half-finished destroy has already
+  // deleted them there is nothing left to tidy there, and the DNS, distribution and certificate still need to go.
+  try {
+    if (host.startsWith('*.')) {
+      // A preview domain: every preview served on it goes first, then its place in the list of preview domains.
+      const base = host.slice(2);
+      for (const project of await listManifestProjects(out.bucket)) {
+        const { previews } = await readManifest(out.bucket, project);
+        for (const [pr, info] of Object.entries(previews ?? {})) {
+          if (isPreviewHost(info.host, [base]) && (await removePreview(out, project, Number(pr)))) {
+            notes.push(`Removed the preview of ${project} #${pr}.`);
+          }
         }
       }
+      for (const r of await listRoutes(out.kvsArn)) if (isPreviewHost(r.host, [base])) await deleteRoute(out.kvsArn, r.host);
+      if ((await readPreviewBases(out.bucket)).includes(base)) {
+        await updatePreviewBases(out.bucket, (bases) => bases.filter((b) => b !== base));
+        notes.push(`${host} is no longer a preview domain.`);
+      }
+    } else {
+      try {
+        await deleteRoute(out.kvsArn, host);
+        notes.push(`Removed the route for ${host}.`);
+      } catch {
+        // no route was set
+      }
     }
-    for (const r of await listRoutes(out.kvsArn)) if (isPreviewHost(r.host, [base])) await deleteRoute(out.kvsArn, r.host);
-    if ((await readPreviewBases(out.bucket)).includes(base)) {
-      await updatePreviewBases(out.bucket, (bases) => bases.filter((b) => b !== base));
-      notes.push(`${host} is no longer a preview domain.`);
-    }
-  } else {
-    try {
-      await deleteRoute(out.kvsArn, host);
-      notes.push(`Removed the route for ${host}.`);
-    } catch {
-      // no route was set
-    }
-  }
 
-  for (const project of await listManifestProjects(out.bucket)) {
-    if ((await readManifest(out.bucket, project)).domains?.includes(host)) {
-      await updateManifest(out.bucket, project, (m) => {
-        m.domains = (m.domains ?? []).filter((d) => d !== host);
-        delete m.live[host];
-      });
-      notes.push(`Removed ${host} from project ${project}.`);
+    for (const project of await listManifestProjects(out.bucket)) {
+      if ((await readManifest(out.bucket, project)).domains?.includes(host)) {
+        await updateManifest(out.bucket, project, (m) => {
+          m.domains = (m.domains ?? []).filter((d) => d !== host);
+          delete m.live[host];
+        });
+        notes.push(`Removed ${host} from project ${project}.`);
+      }
     }
+  } catch (err) {
+    const name = (err as { name?: string }).name;
+    if (name !== 'NoSuchBucket' && name !== 'ResourceNotFoundException') throw err;
+    notes.push('The stack\'s storage is already gone; skipped its routes and project records.');
   }
 
   const zone = await findZone(host).catch(() => undefined);

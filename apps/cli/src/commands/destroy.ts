@@ -27,13 +27,23 @@ export async function destroy(opts: { yes?: boolean }, global: GlobalOptions): P
   const out = readOutputs(stack);
 
   // Custom domains are separate stacks that read this stack's bucket; take them down first.
-  try {
-    for (const d of await listDomainStacks(global.stackName)) {
-      console.log(`Removing domain ${d.host}...`);
+  // Each one is tried even if another fails. The stack itself is only deleted once none are left: a domain's
+  // distribution uses this stack's router and access control, so deleting the stack first would fail.
+  const failed: string[] = [];
+  for (const d of await listDomainStacks(global.stackName)) {
+    console.log(`Removing domain ${d.host}...`);
+    try {
       for (const line of await removeDomain(out, global, d.host)) console.log(`  ${line}`);
+    } catch (err) {
+      failed.push(d.host);
+      console.warn(`  Could not remove ${d.host} (${errorMessage(err)}).`);
     }
-  } catch (err) {
-    console.warn(`Could not remove custom domains (${errorMessage(err)}); remove them with \`deployer domain rm <host>\` before destroying.`);
+  }
+  if (failed.length > 0) {
+    throw new Error(
+      `Stopped before deleting the stack: ${failed.join(', ')} could not be removed. ` +
+        `Nothing else was deleted. Run \`deployer domain rm <host>\` for each, then \`deployer destroy\` again.`,
+    );
   }
 
   // Once the stack is gone its webhook URL is dead, so take the webhooks off the repositories first.
@@ -55,7 +65,10 @@ export async function destroy(opts: { yes?: boolean }, global: GlobalOptions): P
   for (const bucket of [out.bucket, out.buildsBucket]) {
     if (!bucket) continue;
     console.log(`Emptying ${bucket}...`);
-    await emptyBucket(bucket);
+    // Resuming a destroy that stopped part-way: the bucket may already be deleted.
+    await emptyBucket(bucket).catch((err) => {
+      if ((err as { name?: string }).name !== 'NoSuchBucket') throw err;
+    });
   }
 
   console.log('Deleting stack (CloudFront takes a few minutes)...');

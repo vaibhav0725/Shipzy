@@ -405,8 +405,15 @@ deployer delete -p my-app             # remove a project completely (asks you to
 deployer destroy                      # remove the entire stack (asks you to type the stack name)
 ```
 
-`delete` removes the project's routes, every deployment folder, its uploaded sources, its environment variables and its GitHub webhook. If the
-project is live, that site starts returning 404 until something else is deployed.
+`delete` removes the project's routes, every deployment folder, its uploaded sources, its environment variables, its custom
+domains, its pull request previews and its GitHub webhook. If the project is live, that site starts returning 404 until
+something else is deployed.
+
+`destroy` removes the custom domains and the preview domain first (each one's distribution, certificate and the DNS
+records this tool made), then the webhooks, variables and buckets, then the stack. If a domain cannot be removed it stops
+**before** deleting anything else and tells you which one; fix it (or run `deployer domain rm <host>`) and run `destroy`
+again. A `destroy` that was interrupted can be run again: it picks up where it stopped, and `domain rm` also works on a
+stack left in `DELETE_FAILED`.
 
 ### 5.9 More than one stack
 

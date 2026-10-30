@@ -39,6 +39,12 @@ function printRecord(intro: string, rec: { type: string; name: string; value: st
   console.log(`\n${intro}\n  Type   ${rec.type}\n  Name   ${rec.name}\n  Value  ${rec.value}\n`);
 }
 
+/** A failed destroy may already have deleted the stack's storage; recovery commands carry on without it. */
+const storageGone = (err: unknown): undefined => {
+  if ((err as { name?: string }).name === 'NoSuchBucket') return undefined;
+  throw err;
+};
+
 const isApex = (host: string) => host.split('.').length === 2;
 
 /** The deployment a newly added domain should start serving: the newest one that is live somewhere, else the newest. */
@@ -219,8 +225,9 @@ export async function domainVerify(hostArg: string, global: GlobalOptions): Prom
 
 export async function domainRemove(hostArg: string, opts: { yes?: boolean }, global: GlobalOptions): Promise<void> {
   const host = validateHost(hostArg, true);
-  const out = await getOutputs(global.stackName);
-  const project = host.startsWith('*.') ? undefined : await projectOfDomain(out.bucket, host);
+  // Also usable when a failed `destroy` left the stack in DELETE_FAILED, which is when leftovers must be removed.
+  const out = await getOutputs(global.stackName, ['DELETE_FAILED']);
+  const project = host.startsWith('*.') ? undefined : await projectOfDomain(out.bucket, host).catch(storageGone);
   const known = (await listDomainStacks(global.stackName)).some((s) => s.host === host);
   if (!known && !project && !(await findCertificate(host))) throw new Error(`${host} is not a domain of this stack.`);
 

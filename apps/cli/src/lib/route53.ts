@@ -39,9 +39,16 @@ export async function findZone(host: string): Promise<Zone | undefined> {
 }
 
 async function change(zoneId: string, action: 'UPSERT' | 'DELETE', set: ResourceRecordSet): Promise<void> {
-  await client().send(
-    new ChangeResourceRecordSetsCommand({ HostedZoneId: zoneId, ChangeBatch: { Changes: [{ Action: action, ResourceRecordSet: set }] } }),
-  );
+  try {
+    await client().send(
+      new ChangeResourceRecordSetsCommand({ HostedZoneId: zoneId, ChangeBatch: { Changes: [{ Action: action, ResourceRecordSet: set }] } }),
+    );
+  } catch (err) {
+    // A delete whose answer was lost on the network succeeds on the server and fails on the SDK's retry. The record
+    // being gone is what was asked for.
+    if (action === 'DELETE' && (err as { name?: string }).name === 'InvalidChangeBatch' && /not found/i.test((err as Error).message)) return;
+    throw err;
+  }
 }
 
 export const upsertCname = (zoneId: string, name: string, value: string, ttl = 300) =>

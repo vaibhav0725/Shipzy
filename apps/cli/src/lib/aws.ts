@@ -91,10 +91,11 @@ export function engineKeyOf(stack: { Parameters?: { ParameterKey?: string; Param
   return stack.Parameters?.find((p) => p.ParameterKey === 'EngineKey')?.ParameterValue;
 }
 
-export async function getOutputs(stackName: string): Promise<StackOutputs> {
+/** `alsoAllow`: states a recovery command may run in (e.g. DELETE_FAILED, to finish removing what blocked a delete). */
+export async function getOutputs(stackName: string, alsoAllow: string[] = []): Promise<StackOutputs> {
   const stack = await findStack(stackName);
   if (!stack) throw new Error(`Stack "${stackName}" not found. Run \`deployer init\` first.`);
-  if (!OK_STATUSES.has(stack.StackStatus ?? '')) {
+  if (!OK_STATUSES.has(stack.StackStatus ?? '') && !alsoAllow.includes(stack.StackStatus ?? '')) {
     throw new Error(`Stack "${stackName}" is in state ${stack.StackStatus}; wait for it or fix it first.`);
   }
   return readOutputs(stack);

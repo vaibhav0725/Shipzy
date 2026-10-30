@@ -13,6 +13,8 @@ export interface ProjectSummary {
   files: number;
   source?: { repo: string; branch: string; previews: boolean };
   previews: number;
+  domains: string[];
+  envVars: number;
 }
 export interface Manifest {
   project: string;

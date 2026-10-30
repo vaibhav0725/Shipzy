@@ -11,7 +11,10 @@ import {
 } from '@aws-sdk/client-cloudfront-keyvaluestore';
 
 let kvsClient: CloudFrontKeyValueStoreClient | undefined;
-const kvs = () => (kvsClient ??= new CloudFrontKeyValueStoreClient({}));
+// This endpoint occasionally drops a connection, and the SDK has no timeout by default, so a call could hang for
+// minutes. Time out quickly instead: the SDK then retries on a fresh connection.
+const kvs = () =>
+  (kvsClient ??= new CloudFrontKeyValueStoreClient({ requestHandler: { connectionTimeout: 5000, requestTimeout: 10000 } }));
 
 // Every write must quote the store's current ETag, and any other write in between invalidates it
 // (reported as a ValidationException "Pre-Condition failed"). With concurrent deploys that is
