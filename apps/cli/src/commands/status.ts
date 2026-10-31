@@ -2,7 +2,7 @@ import { colorStatus, ui } from '../lib/ui.js';
 import { engineKeyOf, findStack, GlobalOptions, readOutputs, whoAmI } from '../lib/aws.js';
 import { duration, envOf, recentBuilds } from '../lib/builds.js';
 import { formatBytes, timeAgo } from '../lib/format.js';
-import { readPreviewBases } from '@deployer/core';
+import { readPreviewBases } from '@shipzy/core';
 import { listProjects } from '../lib/projects.js';
 
 export async function status(opts: { json?: boolean }, global: GlobalOptions): Promise<void> {

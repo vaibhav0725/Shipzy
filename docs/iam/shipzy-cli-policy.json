@@ -213,6 +213,21 @@
       "Resource": "arn:aws:ssm:*:ACCOUNT_ID:parameter/deployer/*"
     },
     {
+      "Sid": "UsageMetrics",
+      "Effect": "Allow",
+      "Action": "cloudwatch:GetMetricData",
+      "Resource": "*"
+    },
+    {
+      "Sid": "SpendingAlert",
+      "Effect": "Allow",
+      "Action": [
+        "budgets:ViewBudget",
+        "budgets:ModifyBudget"
+      ],
+      "Resource": "arn:aws:budgets::ACCOUNT_ID:budget/Deployer*"
+    },
+    {
       "Sid": "Certificates",
       "Effect": "Allow",
       "Action": [

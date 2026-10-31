@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { detectProject, detectRouting, findOutputDir, hintForBuildFailure, readPackageJson, type Framework, type Routing } from '@deployer/core';
+import { detectProject, detectRouting, findOutputDir, hintForBuildFailure, readPackageJson, type Framework, type Routing } from '@shipzy/core';
 
 export interface BuildResult {
   outDir: string;

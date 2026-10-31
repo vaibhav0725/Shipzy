@@ -22,7 +22,7 @@ export default function Cost() {
               <thead><tr><th>Service</th><th>Used for</th><th>Roughly</th></tr></thead>
               <tbody>
                 <tr><td>CloudFront</td><td>Serving your sites</td><td>First 1 TB and 10M requests a month are free; after that about $0.085 per GB and $1 per million requests</td></tr>
-                <tr><td>Router (CloudFront Function and routing table)</td><td>Choosing which deploy to serve</td><td>About $0.16 per million requests, after a free allowance</td></tr>
+                <tr><td>Router (CloudFront Function and routing table)</td><td>Choosing which deploy to serve</td><td>About $0.13 per million requests ($0.10 for the function, $0.03 for the routing table), after a free allowance for the function</td></tr>
                 <tr><td>S3</td><td>Storing every deploy</td><td>About $0.023 per GB a month. Retention keeps it small</td></tr>
                 <tr><td>Secrets Manager</td><td>GitHub token and webhook secret</td><td>$0.40 per secret a month, so about $0.80 fixed</td></tr>
                 <tr><td>CodeBuild</td><td>Remote and GitHub builds</td><td>100 build minutes a month free, then about $0.005 a minute</td></tr>
@@ -67,11 +67,12 @@ export default function Cost() {
 
           <h2 id="guardrails">Keeping the bill predictable</h2>
           <ul>
-            <li>Create an <strong>AWS Budget</strong> alert for the account, so a spike emails you early. AWS has no hard spending cap.</li>
+            <li>Ask for a <strong>spending alert</strong>: <code>shipzy init --budget 25 --budget-email you@example.com</code> creates an AWS Budget that emails you at 80% and 100% of the amount, and when AWS forecasts you will pass it. AWS has no hard spending cap, so this is a warning, not a stop. It watches the whole account.</li>
+            <li>Run <code>shipzy cost</code> at any time for this month so far and a projection for the whole month.</li>
             <li>Retention is on by default: the newest ten deploys of each project are kept, plus anything live, so storage stays bounded.</li>
             <li>Small sites sit comfortably inside the CloudFront free allowance. A sudden increase in traffic is the thing to watch.</li>
           </ul>
-          <p>A guided budget alarm and a command that shows what you have spent this month are planned. See <Link href="/docs/limits">limits and roadmap</Link>.</p>
+          <p><code>shipzy cost</code> is an estimate built from CloudWatch usage and list prices; your AWS Billing page is the exact figure. See <Link href="/docs/cli-reference#cost">the CLI reference</Link> and <Link href="/docs/limits">limits and roadmap</Link>.</p>
         </div>
       </div>
     </>

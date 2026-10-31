@@ -1,7 +1,7 @@
 import { ui } from '../lib/ui.js';
 import * as path from 'node:path';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { DEFAULT_KEEP, newDeploymentId, readManifest, resolveTargetHosts, s3, startBuild } from '@deployer/core';
+import { DEFAULT_KEEP, newDeploymentId, readManifest, resolveTargetHosts, s3, startBuild } from '@shipzy/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { projectBuildEnv } from '../lib/build-env.js';
 import { detectFramework } from '../lib/build.js';

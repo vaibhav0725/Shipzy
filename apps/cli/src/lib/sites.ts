@@ -1,7 +1,7 @@
 import { ui } from './ui.js';
 import * as fs from 'node:fs';
 import { ListStacksCommand } from '@aws-sdk/client-cloudformation';
-import { assertProjectName, needsOwnSite, readManifest, updateManifest } from '@deployer/core';
+import { assertProjectName, needsOwnSite, readManifest, updateManifest } from '@shipzy/core';
 import { assetPath } from './assets.js';
 import { cloudFormation, findStack, GlobalOptions, StackOutputs } from './aws.js';
 import { deployStack, outputsOf, paramsOf, removeStack } from './cfn.js';
@@ -48,6 +48,7 @@ export async function ensureProjectSite(out: StackOutputs, global: GlobalOptions
 export interface SiteStackInfo {
   stackName: string;
   project: string;
+  distributionId?: string;
   distributionDomain?: string;
 }
 
@@ -68,7 +69,7 @@ export async function listSiteStacks(stackName: string): Promise<SiteStackInfo[]
   const found = await Promise.all(names.map(async (name) => ({ name, stack: await findStack(name) })));
   return found.flatMap(({ name, stack }) =>
     stack
-      ? [{ stackName: name, project: paramsOf(stack)['ProjectName'] ?? name.slice(prefix.length), distributionDomain: outputsOf(stack)['DistributionDomain'] }]
+      ? [{ stackName: name, project: paramsOf(stack)['ProjectName'] ?? name.slice(prefix.length), distributionId: outputsOf(stack)['DistributionId'], distributionDomain: outputsOf(stack)['DistributionDomain'] }]
       : [],
   );
 }

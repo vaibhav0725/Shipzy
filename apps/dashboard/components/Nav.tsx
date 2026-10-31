@@ -20,7 +20,7 @@ function ThemeSwitch() {
   const [theme, setTheme] = useState<Theme>('system');
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('deployer-theme');
+      const saved = localStorage.getItem('shipzy-theme');
       if (saved === 'light' || saved === 'dark') setTheme(saved);
     } catch {
       /* private mode: stay on system */
@@ -29,7 +29,7 @@ function ThemeSwitch() {
   const choose = (next: Theme) => {
     setTheme(next);
     try {
-      localStorage.setItem('deployer-theme', next);
+      localStorage.setItem('shipzy-theme', next);
     } catch {
       /* the choice just will not be remembered */
     }

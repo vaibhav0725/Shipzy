@@ -19,8 +19,9 @@ import { previewsList, previewsRemove } from './commands/previews.js';
 import { pruneCommand } from './commands/prune.js';
 import { repoDeploy } from './commands/repo-deploy.js';
 import { rollback } from './commands/rollback.js';
+import { cost } from './commands/cost.js';
 import { status } from './commands/status.js';
-import { DEFAULT_GRACE_MINUTES, DEFAULT_KEEP } from '@deployer/core';
+import { DEFAULT_GRACE_MINUTES, DEFAULT_KEEP } from '@shipzy/core';
 
 // Some networks advertise IPv6 but drop it, and Node's connection racing then stalls AWS
 // requests (notably the KeyValueStore endpoint). Try IPv4 first and connect to one address
@@ -29,11 +30,11 @@ dns.setDefaultResultOrder('ipv4first');
 net.setDefaultAutoSelectFamily(false);
 
 // Injected by the bundler; plain `tsc` builds (and tests) have no value for it.
-declare const __DEPLOYER_VERSION__: string | undefined;
+declare const __SHIPZY_VERSION__: string | undefined;
 
 const program = new Command()
   .name('shipzy')
-  .version(typeof __DEPLOYER_VERSION__ === 'undefined' ? 'dev' : __DEPLOYER_VERSION__)
+  .version(typeof __SHIPZY_VERSION__ === 'undefined' ? 'dev' : __SHIPZY_VERSION__)
   .description('Deploy static React and Next.js sites to your own AWS account (S3 + CloudFront)')
   .option('--profile <name>', 'AWS profile to use')
   .option('--region <region>', 'AWS region (default: AWS_REGION or us-east-1)')
@@ -55,7 +56,12 @@ program
   .option('--demo', 'run on sample data, without reading or changing anything in AWS')
   .action((opts) => dashboard(opts, globals()));
 
-program.command('init').description('Create or update the AWS stack').action(() => init(globals()));
+program
+  .command('init')
+  .description('Create or update the AWS stack')
+  .option('--budget <usd>', 'email me when the month is heading past this amount in USD ("off" removes the alert)')
+  .option('--budget-email <email>', 'where the spending alert is sent')
+  .action((opts) => init(globals(), opts));
 
 program
   .command('deploy [dir]')
@@ -94,6 +100,12 @@ program
   .description('Show the account, stack, CloudFront URL and totals')
   .option('--json', 'machine-readable output')
   .action((opts) => status(opts, globals()));
+
+program
+  .command('cost')
+  .description('Estimate what this month is costing in AWS, and what the whole month will come to')
+  .option('--json', 'machine-readable output')
+  .action((opts) => cost(opts, globals()));
 
 program
   .command('builds')

@@ -6,7 +6,7 @@ import {
   readManifest,
   readPreviewBases,
   removePreview,
-} from '@deployer/core';
+} from '@shipzy/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { table, timeAgo } from '../lib/format.js';
 

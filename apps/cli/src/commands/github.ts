@@ -16,7 +16,7 @@ import {
   startBuild,
   updateManifest,
   upsertWebhook,
-} from '@deployer/core';
+} from '@shipzy/core';
 import { getOutputs, GlobalOptions, StackOutputs } from '../lib/aws.js';
 import { projectBuildEnv } from '../lib/build-env.js';
 import { promptHidden } from '../lib/prompt.js';

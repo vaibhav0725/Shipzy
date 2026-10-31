@@ -250,7 +250,7 @@ export async function planAction(body: Body): Promise<ActionPlan> {
       const content = typeof body.content === 'string' ? body.content : '';
       if (content.trim() === '') throw new InputError('Paste the contents of a .env file.');
       if (content.length > 100_000) throw new InputError('That file is too large.');
-      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deployer-env-'));
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shipzy-env-'));
       const file = path.join(dir, '.env');
       fs.writeFileSync(file, content, { mode: 0o600 });
       // Every value is a secret as far as the log is concerned.

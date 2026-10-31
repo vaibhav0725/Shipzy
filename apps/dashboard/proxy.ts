@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // `shipzy dashboard` opened: a per-launch token (exchanged once for a cookie), a Host header that names this
 // server (so a web page on another site cannot reach it through DNS rebinding), and same-origin writes.
 
-export const COOKIE = 'deployer_dash';
+export const COOKIE = 'shipzy_dash';
 
 function same(a: string, b: string): boolean {
   const x = Buffer.from(a);
@@ -17,7 +17,7 @@ const refuse = (status: number, message: string) =>
   new NextResponse(message, { status, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
 
 export function proxy(req: NextRequest) {
-  const token = process.env.DEPLOYER_DASH_TOKEN;
+  const token = process.env.SHIPZY_DASH_TOKEN;
   if (!token) return refuse(503, 'The dashboard is not configured. Start it with: shipzy dashboard');
 
   const port = process.env.PORT ?? '4173';

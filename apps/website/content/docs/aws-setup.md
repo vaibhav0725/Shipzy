@@ -22,13 +22,15 @@ shipzy reads your AWS profile the same way the AWS CLI does. Use any of:
 An administrator key works, but it is far more than shipzy needs. We publish a policy that allows only what shipzy does, and a script that creates a user with it.
 
 1. Download the policy and the script, and **read them**:
-   - [deployer-cli-policy.json](/iam/deployer-cli-policy.json)
+   - [shipzy-cli-policy.json](/iam/shipzy-cli-policy.json)
    - [create-limited-user.sh](/iam/create-limited-user.sh)
 2. Run the script with an administrator profile. It creates a managed policy and an IAM user, and writes the new key straight into a local AWS profile without printing it:
 
    ```sh
    AWS_PROFILE=<your-admin-profile> bash create-limited-user.sh
    ```
+
+   Running the script again later is safe: it adds a new version of the policy, which is how you pick up permissions added in a newer shipzy (for example `cost` and the spending alert).
 
 3. Use the new profile from then on:
 
@@ -40,6 +42,7 @@ What the policy allows, in words:
 
 - CloudFormation stacks, S3 buckets, Lambda functions and IAM roles **whose names start with `Deployer`** (the default stack name);
 - CloudFront, CodeBuild, certificates, Route 53 records, the stack's own parameters and its two secrets;
+- read-only CloudWatch usage numbers (for `shipzy cost`) and a budget named `Deployer*` (for the spending alert);
 - nothing else: not your other buckets, not other IAM users or access keys, not other services.
 
 If you use a different stack name (`--stack-name Staging`), replace the `Deployer` prefix in the policy with it.

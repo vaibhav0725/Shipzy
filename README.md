@@ -15,7 +15,7 @@ environment variables, custom domains (HTTPS, Route 53 automation) and a local w
 npm install
 npm run build          # builds the shared code, the Lambda zip, the stack template and the single-file CLI
 cd apps/cli && npm link && cd ../..   # puts a real `shipzy` command on your PATH
-export AWS_PROFILE=deployer-dev       # use an IAM user or SSO profile, not root
+export AWS_PROFILE=my-aws-profile       # use an IAM user or SSO profile, not root
 shipzy --version
 ```
 
@@ -38,6 +38,7 @@ shipzy domain ls                              # domains and their state
 shipzy domain rm app.example.com              # remove it completely
 shipzy dashboard                              # local web UI: deploy from a folder or GitHub, manage everything
 shipzy status                                 # account, stack, URL, totals
+shipzy cost                                   # what this month is costing, and the projection
 shipzy list                                   # all projects: live host, version, size
 shipzy list --project demo                    # one project's deployments
 shipzy rollback --project demo                # back to the previous deployment

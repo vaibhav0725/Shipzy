@@ -3,7 +3,7 @@ import {
   DeleteStackCommand,
   waitUntilStackDeleteComplete,
 } from '@aws-sdk/client-cloudformation';
-import { emptyBucket, envParamPrefix, listGithubConnections } from '@deployer/core';
+import { emptyBucket, envParamPrefix, listGithubConnections } from '@shipzy/core';
 import { cloudFormation, errorMessage, findStack, GlobalOptions, readOutputs } from '../lib/aws.js';
 import { confirmByTyping } from '../lib/prompt.js';
 import { deleteParamsUnder } from '../lib/ssm.js';

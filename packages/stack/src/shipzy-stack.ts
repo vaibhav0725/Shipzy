@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import * as cdk from 'aws-cdk-lib';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as budgets from 'aws-cdk-lib/aws-budgets';
 import * as codebuild from 'aws-cdk-lib/aws-codebuild';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
@@ -14,7 +15,7 @@ import { Construct } from 'constructs';
 const ENGINE_PLACEHOLDER =
   "exports.promote = exports.webhook = async () => { throw new Error('Engine code is not installed yet. Run: shipzy init'); };";
 
-export class DeployerStack extends cdk.Stack {
+export class ShipzyStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
@@ -255,6 +256,41 @@ export class DeployerStack extends cdk.Stack {
     webhookSecret.grantRead(webhook);
     webhook.addToRolePolicy(new iam.PolicyStatement({ actions: ['codebuild:StartBuild'], resources: [project.projectArn] }));
     const webhookUrl = webhook.addFunctionUrl({ authType: lambda.FunctionUrlAuthType.NONE });
+
+    // ---- Spending alert: an optional monthly budget that emails before the bill surprises anyone ----
+
+    const budgetLimit = new cdk.CfnParameter(this, 'BudgetLimit', {
+      type: 'Number',
+      default: 0,
+      minValue: 0,
+      description: 'Monthly spending alert in USD for the whole AWS account; 0 means no alert. Set by `shipzy init --budget`',
+    });
+    const budgetEmail = new cdk.CfnParameter(this, 'BudgetEmail', {
+      type: 'String',
+      default: '',
+      description: 'Where the spending alert is emailed',
+    });
+    const hasBudget = new cdk.CfnCondition(this, 'HasBudget', {
+      expression: cdk.Fn.conditionAnd(
+        cdk.Fn.conditionNot(cdk.Fn.conditionEquals(budgetLimit.valueAsString, '0')),
+        cdk.Fn.conditionNot(cdk.Fn.conditionEquals(budgetEmail.valueAsString, '')),
+      ),
+    });
+    const alert = (type: 'ACTUAL' | 'FORECASTED', threshold: number): budgets.CfnBudget.NotificationWithSubscribersProperty => ({
+      notification: { notificationType: type, comparisonOperator: 'GREATER_THAN', thresholdType: 'PERCENTAGE', threshold },
+      subscribers: [{ subscriptionType: 'EMAIL', address: budgetEmail.valueAsString }],
+    });
+    const budget = new budgets.CfnBudget(this, 'MonthlyBudget', {
+      budget: {
+        // The IAM policy for the CLI user allows budgets named Deployer*, which is also the default stack name.
+        budgetName: cdk.Fn.sub('${AWS::StackName}-monthly'),
+        budgetType: 'COST',
+        timeUnit: 'MONTHLY',
+        budgetLimit: { amount: budgetLimit.valueAsNumber, unit: 'USD' },
+      },
+      notificationsWithSubscribers: [alert('ACTUAL', 80), alert('ACTUAL', 100), alert('FORECASTED', 100)],
+    });
+    budget.cfnOptions.condition = hasBudget;
 
     new cdk.CfnOutput(this, 'BucketName', { value: bucket.bucketName });
     new cdk.CfnOutput(this, 'DistributionId', { value: distribution.distributionId });

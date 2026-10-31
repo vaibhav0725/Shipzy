@@ -39,11 +39,11 @@ const MAX_LINES = 5000;
 const MAX_JOBS = 60;
 
 // Next.js may load this module more than once (route bundles, dev reloads); the jobs must be one shared set.
-const g = globalThis as unknown as { __deployerJobs?: Map<string, Job>; __deployerExitHook?: boolean };
-const jobs = (g.__deployerJobs ??= new Map<string, Job>());
+const g = globalThis as unknown as { __shipzyJobs?: Map<string, Job>; __shipzyExitHook?: boolean };
+const jobs = (g.__shipzyJobs ??= new Map<string, Job>());
 
-if (!g.__deployerExitHook) {
-  g.__deployerExitHook = true;
+if (!g.__shipzyExitHook) {
+  g.__shipzyExitHook = true;
   const stop = () => {
     for (const job of jobs.values()) job.child?.kill('SIGTERM');
   };

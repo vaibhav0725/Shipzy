@@ -8,7 +8,7 @@ import {
   setRoute,
   updatePreviewBases,
   updateManifest,
-} from '@deployer/core';
+} from '@shipzy/core';
 import {
   describeCertificate,
   findCertificate,
@@ -33,7 +33,7 @@ import {
 import { table } from '../lib/format.js';
 import { confirmByTyping } from '../lib/prompt.js';
 import { findZone, upsertAlias, upsertCname } from '../lib/route53.js';
-import { isPreviewHost } from '@deployer/core';
+import { isPreviewHost } from '@shipzy/core';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 

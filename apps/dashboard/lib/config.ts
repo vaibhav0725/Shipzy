@@ -10,14 +10,14 @@ export interface Globals {
 export function settings() {
   let globals: Globals = { stackName: 'Deployer' };
   try {
-    if (process.env.DEPLOYER_GLOBALS) globals = { ...globals, ...JSON.parse(process.env.DEPLOYER_GLOBALS) };
+    if (process.env.SHIPZY_GLOBALS) globals = { ...globals, ...JSON.parse(process.env.SHIPZY_GLOBALS) };
   } catch {
     /* keep the defaults */
   }
   return {
     // In development (`next dev`) fall back to the CLI built in this repository.
-    cli: process.env.DEPLOYER_CLI ?? path.resolve(process.cwd(), '../cli/dist/shipzy.mjs'),
-    cwd: process.env.DEPLOYER_CWD ?? process.env.HOME ?? process.cwd(),
+    cli: process.env.SHIPZY_CLI ?? path.resolve(process.cwd(), '../cli/dist/shipzy.mjs'),
+    cwd: process.env.SHIPZY_CWD ?? process.env.HOME ?? process.cwd(),
     globals,
   };
 }

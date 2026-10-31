@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { s3 } from '@deployer/core';
+import { s3 } from '@shipzy/core';
 import mime from 'mime-types';
 
 function listFiles(root: string, dir = root): string[] {

@@ -12,7 +12,7 @@ import {
   setMode,
   setRoute,
   updateManifest,
-} from '@deployer/core';
+} from '@shipzy/core';
 import { env } from './env.js';
 import {
   previewFailed,

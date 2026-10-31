@@ -126,7 +126,7 @@ export default function GithubConnect(props: { selected: string; onSession: (con
             .
           </li>
           <li>
-            Application name: <code>Deployer</code> (anything). Homepage URL and Authorization callback URL: <code>http://127.0.0.1</code>
+            Application name: <code>Shipzy</code> (anything). Homepage URL and Authorization callback URL: <code>http://127.0.0.1</code>
           </li>
           <li>Click <em>Register application</em>, then tick <em>Enable Device Flow</em> and save. Do not create a client secret.</li>
           <li>Paste the <em>Client ID</em> here:</li>

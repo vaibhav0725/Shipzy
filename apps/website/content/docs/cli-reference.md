@@ -25,6 +25,13 @@ On a terminal shipzy colours its output: green for success and healthy status, r
 
 Creates or updates the stack, uploads the engine code and build script, and installs them. Safe to rerun. If a first attempt failed and rolled back, `init` removes the failed stack and retries.
 
+| Option | Meaning |
+|---|---|
+| `--budget <usd>` | Email me when the month is heading past this amount. `off` removes the alert |
+| `--budget-email <email>` | Where the alert goes (asked for if you leave it out) |
+
+The first time you run `init` in a terminal it offers a spending alert; press Enter to skip. The alert is an AWS Budget for the whole account that emails at 80% and 100% of the amount and when AWS forecasts you will pass it. AWS has no spending cap, so it warns and does not stop anything. Later runs keep it as it is unless you pass `--budget` again.
+
 ## `deploy [dir]`
 
 | Option | Meaning |
@@ -47,6 +54,12 @@ No options: a table of all projects. `-p, --project <name>` lists one project's 
 ## `status`
 
 The account, region, stack state, bucket, CloudFront URL, build setup, webhook URL, number of GitHub-connected projects, the last build, and totals. `--json` for scripts.
+
+## `cost`
+
+What this month is costing, from CloudWatch usage and AWS list prices: CloudFront traffic, the router, S3 storage, CodeBuild minutes and Secrets Manager, with the cost so far, a projection for the whole month, and traffic by address. `--json` for scripts.
+
+It is an estimate. It uses US and Europe rates, assumes the free allowances are unused by anything else in the account, and leaves out Route 53 zones. CloudFront metrics arrive a few minutes late. AWS Billing is the exact figure. It needs the `UsageMetrics` part of the [published policy](/docs/aws-setup).
 
 ## `builds`
 
@@ -134,7 +147,7 @@ Removes GitHub webhooks, custom domains and project addresses, empties both buck
 | `AWS_PROFILE`, `AWS_REGION` | Which credentials and region to use |
 | `GITHUB_TOKEN` | A GitHub token for `github connect`, instead of the hidden prompt |
 | `NO_COLOR`, `FORCE_COLOR` | Switch colour off, or force it on |
-| `DEPLOYER_GITHUB_CLIENT_ID` | A GitHub OAuth App client ID for the dashboard's "Connect GitHub" (it can also be saved from the dashboard) |
+| `SHIPZY_GITHUB_CLIENT_ID` | A GitHub OAuth App client ID for the dashboard's "Connect GitHub" (it can also be saved from the dashboard) |
 
 ## Exit codes
 

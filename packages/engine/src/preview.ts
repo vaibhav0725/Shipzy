@@ -18,7 +18,7 @@ import {
   setRoute,
   updateManifest,
   upsertComment,
-} from '@deployer/core';
+} from '@shipzy/core';
 import { env } from './env.js';
 
 const ID_RE = /^d-\d{8}T\d{6}-[0-9a-f]{6}$/;

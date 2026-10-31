@@ -1,5 +1,5 @@
 import { ui } from '../lib/ui.js';
-import { projectRoutes, readManifest } from '@deployer/core';
+import { projectRoutes, readManifest } from '@shipzy/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { formatBytes, table, timeAgo } from '../lib/format.js';
 import { listProjects } from '../lib/projects.js';

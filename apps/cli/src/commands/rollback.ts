@@ -1,5 +1,5 @@
 import { ui } from '../lib/ui.js';
-import { projectRoutes, readManifest, routeTarget, setRoute, updateManifest } from '@deployer/core';
+import { projectRoutes, readManifest, routeTarget, setRoute, updateManifest } from '@shipzy/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 
 export interface RollbackOptions {

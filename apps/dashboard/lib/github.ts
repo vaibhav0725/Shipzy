@@ -9,8 +9,8 @@ import { InputError } from './validate';
 // browser). It is only handed to the CLI, through an environment variable, when a project is connected.
 // The OAuth App's client ID is public by design; no client secret is involved.
 
-const OAUTH = process.env.DEPLOYER_GITHUB_OAUTH_URL ?? 'https://github.com';
-const API = process.env.DEPLOYER_GITHUB_API_URL ?? 'https://api.github.com';
+const OAUTH = process.env.SHIPZY_GITHUB_OAUTH_URL ?? 'https://github.com';
+const API = process.env.SHIPZY_GITHUB_API_URL ?? 'https://api.github.com';
 
 // repo: read repositories (private ones too) and manage their webhooks and pull request comments.
 const SCOPE = 'repo';
@@ -33,8 +33,8 @@ interface State {
   devices: Map<string, Device>;
   session?: Session;
 }
-const g = globalThis as unknown as { __deployerGithub?: State };
-const state: State = (g.__deployerGithub ??= { devices: new Map<string, Device>() });
+const g = globalThis as unknown as { __shipzyGithub?: State };
+const state: State = (g.__shipzyGithub ??= { devices: new Map<string, Device>() });
 
 // The client ID comes from the environment, or from the dashboard's setup box (saved here so it is entered once).
 const CONFIG_FILE = path.join(os.homedir(), '.shipzy', 'dashboard.json');
@@ -54,7 +54,7 @@ function savedClientId(): string | undefined {
   return undefined;
 }
 
-export const clientId = () => process.env.DEPLOYER_GITHUB_CLIENT_ID?.trim() || savedClientId();
+export const clientId = () => (process.env.SHIPZY_GITHUB_CLIENT_ID ?? process.env.DEPLOYER_GITHUB_CLIENT_ID)?.trim() || savedClientId();
 
 /** Remembers the OAuth App's client ID (public, not a secret) so the setup is a one-time step. */
 export function saveClientId(value: unknown): void {
@@ -86,7 +86,7 @@ async function call<T>(url: string, init: RequestInit & { token?: string }): Pro
     ...rest,
     headers: {
       Accept: 'application/json',
-      'User-Agent': 'deployer-dashboard',
+      'User-Agent': 'shipzy-dashboard',
       ...(token ? { Authorization: `Bearer ${token}`, 'X-GitHub-Api-Version': '2022-11-28' } : {}),
       ...(rest.body ? { 'Content-Type': 'application/json' } : {}),
     },
@@ -105,7 +105,7 @@ async function call<T>(url: string, init: RequestInit & { token?: string }): Pro
 
 export async function startDevice() {
   const id = clientId();
-  if (!id) throw new InputError('GitHub login is not set up: set DEPLOYER_GITHUB_CLIENT_ID (see the guide), or paste a token instead.');
+  if (!id) throw new InputError('GitHub login is not set up: set SHIPZY_GITHUB_CLIENT_ID (see the guide), or paste a token instead.');
   const { status, body } = await call<{
     device_code?: string;
     user_code?: string;

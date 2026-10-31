@@ -18,7 +18,7 @@ await build({
   platform: 'node',
   target: 'node20',
   format: 'esm',
-  define: { __DEPLOYER_VERSION__: JSON.stringify(version), __DASHBOARD_PACKAGE__: JSON.stringify(dashboardPackage) },
+  define: { __SHIPZY_VERSION__: JSON.stringify(version), __DASHBOARD_PACKAGE__: JSON.stringify(dashboardPackage) },
   // Some bundled dependencies use require(); give them one.
   banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" },
   legalComments: 'none',

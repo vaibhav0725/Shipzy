@@ -24,7 +24,7 @@ shipzy is an **early preview**. Everything below is as accurate as we can make i
 - **One preview domain is used per stack**, and a preview name is `<project>-pr-<number>`, so the project name plus that must fit in 63 characters.
 - **A GitHub token is required to connect a repository**, even a public one: it registers the webhook and is sent when cloning. One token serves a whole stack.
 - **Preview comments need a token with pull request access.** Without it the preview still works; only the comment is missing.
-- **AWS has no hard spending cap.** Create an AWS Budget alert for the account.
+- **AWS has no hard spending cap.** `shipzy init --budget 25 --budget-email you@example.com` sets an alert that emails you, and `shipzy cost` shows the month so far. Neither stops spending.
 
 ## Known gaps
 
@@ -35,7 +35,7 @@ shipzy is an **early preview**. Everything below is as accurate as we can make i
 
 Roughly in this order:
 
-1. **A first public release**, with a cost command and a guided budget alarm.
+1. **A first public release.**
 2. **Server-rendered Next.js**, running in your account on Lambda, with the cost and trade-offs written down first.
 3. **Generic servers**: a Node or Express app as a function, then containers for anything else (Python, Go, WebSockets).
 4. **A hosted dashboard** that connects to your AWS account through a cross-account role, with a GitHub App for one-click repository access.

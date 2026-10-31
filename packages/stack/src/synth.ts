@@ -1,14 +1,14 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as cdk from 'aws-cdk-lib';
-import { DeployerStack } from './deployer-stack';
+import { ShipzyStack } from './shipzy-stack';
 import { DomainStack } from './domain-stack';
 import { SiteStack } from './site-stack';
 
 // The stack has no file assets, so it needs no `cdk bootstrap`: we synthesize a
 // plain CloudFormation template that the CLI deploys directly.
 const app = new cdk.App({ analyticsReporting: false });
-const stack = new DeployerStack(app, 'Deployer', {
+const stack = new ShipzyStack(app, 'Deployer', {
   synthesizer: new cdk.DefaultStackSynthesizer({ generateBootstrapVersionRule: false }),
 });
 

@@ -27,3 +27,15 @@ export async function promptHidden(question: string): Promise<string> {
     process.stdout.write('\n');
   }
 }
+
+/** Asks one question and returns the trimmed answer ("" when stdin is closed). */
+export async function ask(question: string): Promise<string> {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return (await rl.question(question)).trim();
+  } catch {
+    return '';
+  } finally {
+    rl.close();
+  }
+}

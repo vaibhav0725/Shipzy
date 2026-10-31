@@ -10,7 +10,7 @@ import {
   readManifest,
   readPreviewBases,
   startBuild,
-} from '@deployer/core';
+} from '@shipzy/core';
 import { env } from './env.js';
 
 interface FunctionUrlEvent {

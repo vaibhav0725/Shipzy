@@ -10,7 +10,7 @@ import {
   removePreview,
   updateManifest,
   updatePreviewBases,
-} from '@deployer/core';
+} from '@shipzy/core';
 import { deleteCertificate, describeCertificate, findCertificate } from './acm.js';
 import { cloudFormation, errorMessage, findStack, GlobalOptions, StackOutputs } from './aws.js';
 import { outputsOf, paramsOf, removeStack } from './cfn.js';
@@ -93,7 +93,7 @@ resolver.setServers(['8.8.8.8', '1.1.1.1']);
 
 /** Does the host resolve to this CloudFront distribution? For a wildcard, a made-up label is probed. */
 export async function checkDns(host: string, distributionDomain: string): Promise<DnsState> {
-  const name = host.startsWith('*.') ? `deployer-check.${host.slice(2)}` : host;
+  const name = host.startsWith('*.') ? `shipzy-check.${host.slice(2)}` : host;
   try {
     const cnames = await resolver.resolveCname(name);
     if (cnames.some((c) => c.replace(/\.$/, '').toLowerCase() === distributionDomain.toLowerCase())) return 'ok';

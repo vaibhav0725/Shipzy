@@ -2,7 +2,8 @@ import { spinner, ui, uiErr } from '../lib/ui.js';
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import {
-  CloudFormationClient,
+  type Parameter,
+  type Stack,
   CreateStackCommand,
   DeleteStackCommand,
   UpdateStackCommand,
@@ -11,9 +12,10 @@ import {
   waitUntilStackUpdateComplete,
 } from '@aws-sdk/client-cloudformation';
 import { HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
-import { s3 } from '@deployer/core';
+import { s3 } from '@shipzy/core';
 import { assetPath as asset } from '../lib/assets.js';
-import { waitOrExplain } from '../lib/cfn.js';
+import { paramsOf, waitOrExplain } from '../lib/cfn.js';
+import { ask } from '../lib/prompt.js';
 import {
   cloudFormation,
   engineKeyOf,
@@ -27,7 +29,42 @@ import {
 const MAX_WAIT_SECONDS = 1800;
 const BUILD_SCRIPT_KEY = 'scripts/build.sh';
 
-export async function init(opts: GlobalOptions): Promise<void> {
+export interface InitOptions {
+  /** monthly spending alert in USD, or "off" */
+  budget?: string;
+  budgetEmail?: string;
+}
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+interface Budget {
+  limit: number;
+  email: string;
+}
+
+/** What the person asked for, or undefined to leave the stack's alert as it is. */
+async function wantedBudget(opts: InitOptions, existing: Stack | undefined): Promise<Budget | undefined> {
+  const keptEmail = existing ? paramsOf(existing)['BudgetEmail'] : undefined;
+  let raw = opts.budget?.trim();
+  if (raw === undefined && !existing && process.stdin.isTTY) {
+    // The first time only; after that the flags change it.
+    console.log(`\n${ui.bold('Spending alert')} ${ui.dim('(optional)')}`);
+    console.log(ui.dim('AWS has no spending cap, but it can email you when the month is heading past an amount you choose.'));
+    raw = await ask(`Monthly amount in USD, or Enter to skip: $`);
+    if (raw === '') return undefined;
+  }
+  if (raw === undefined) return undefined;
+  if (/^(off|none|0)$/i.test(raw)) return { limit: 0, email: keptEmail ?? '' };
+  const limit = Number(raw.replace(/^\$/, ''));
+  if (!Number.isFinite(limit) || limit <= 0 || limit > 1_000_000) throw new Error(`"${raw}" is not an amount in USD (for example: --budget 25).`);
+  let email = opts.budgetEmail?.trim() || keptEmail || '';
+  if (!email && process.stdin.isTTY) email = await ask('Email for the alert: ');
+  if (!EMAIL.test(email)) throw new Error('A spending alert needs an email address: --budget-email you@example.com');
+  return { limit, email };
+}
+
+export async function init(global: GlobalOptions, flags: InitOptions = {}): Promise<void> {
+  const opts = global;
   const me = await whoAmI();
   console.log(`${ui.dim('AWS account')} ${ui.name(me.account)} ${ui.dim(`(${me.arn})`)}`);
   if (me.arn.endsWith(':root')) {
@@ -57,7 +94,8 @@ export async function init(opts: GlobalOptions): Promise<void> {
     await waitUntilStackDeleteComplete({ client: cfn, maxWaitTime: MAX_WAIT_SECONDS }, { StackName: opts.stackName });
     stack = undefined;
   }
-  const changed = await applyStack(opts.stackName, templateBody, stack ? (engineKeyOf(stack) ?? '') : '', !stack);
+  const budget = await wantedBudget(flags, stack);
+  const changed = await applyStack(opts.stackName, templateBody, stack ? (engineKeyOf(stack) ?? '') : '', !stack, budget);
   stack = (await findStack(opts.stackName))!;
   const out = readOutputs(stack);
   if (!out.buildsBucket) throw new Error('Stack has no Builds bucket after the update; this is a bug.');
@@ -111,7 +149,7 @@ export async function init(opts: GlobalOptions): Promise<void> {
   // 3. Point the stack's Lambda functions at it.
   if (engineKeyOf(stack) !== engineKey) {
     console.log(ui.step('Installing the engine...'));
-    await applyStack(opts.stackName, templateBody, engineKey, false);
+    await applyStack(opts.stackName, templateBody, engineKey, false, budget);
   } else if (!changed) {
     console.log(ui.ok('Already up to date.'));
   }
@@ -120,13 +158,23 @@ export async function init(opts: GlobalOptions): Promise<void> {
 }
 
 /** Creates or updates the stack with the given engine key. Returns false when nothing needed changing. */
-async function applyStack(stackName: string, templateBody: string, engineKey: string, create: boolean): Promise<boolean> {
+async function applyStack(stackName: string, templateBody: string, engineKey: string, create: boolean, budget?: Budget): Promise<boolean> {
   const cfn = cloudFormation();
+  const parameters: Parameter[] = [{ ParameterKey: 'EngineKey', ParameterValue: engineKey }];
+  if (budget) {
+    parameters.push({ ParameterKey: 'BudgetLimit', ParameterValue: String(budget.limit) }, { ParameterKey: 'BudgetEmail', ParameterValue: budget.email });
+  } else if (!create) {
+    // Keep the alert as it is. A stack made before alerts existed has no such parameter to reuse, so it takes the default.
+    const existing = await findStack(stackName);
+    for (const key of ['BudgetLimit', 'BudgetEmail']) {
+      if (existing?.Parameters?.some((p) => p.ParameterKey === key)) parameters.push({ ParameterKey: key, UsePreviousValue: true });
+    }
+  }
   const common = {
     StackName: stackName,
     TemplateBody: templateBody,
     Capabilities: ['CAPABILITY_IAM' as const],
-    Parameters: [{ ParameterKey: 'EngineKey', ParameterValue: engineKey }],
+    Parameters: parameters,
   };
 
   if (create) {
@@ -171,5 +219,10 @@ async function printSummary(stackName: string): Promise<void> {
   console.log(`  ${ui.dim('Default URL: ')} ${ui.url(`https://${out.domain}`)}`);
   console.log(`  ${ui.dim('Builds:      ')} ${out.buildProject}`);
   console.log(`  ${ui.dim('Webhook URL: ')} ${out.webhookUrl}`);
+  const params = paramsOf(stack);
+  const limit = Number(params['BudgetLimit'] ?? 0);
+  console.log(
+    `  ${ui.dim('Spend alert: ')} ${limit > 0 && params['BudgetEmail'] ? `$${limit} a month, emailed to ${params['BudgetEmail']}` : ui.dim('off (shipzy init --budget 25 --budget-email you@example.com)')}`,
+  );
   console.log(`\n${ui.bold('Next:')} ${ui.accent('shipzy deploy <react-app-dir> --project <name>')}`);
 }

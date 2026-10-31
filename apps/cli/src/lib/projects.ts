@@ -1,4 +1,4 @@
-import { isPreviewHost, listManifestProjects, listRoutes, prefixSize, readManifest, readPreviewBases } from '@deployer/core';
+import { isPreviewHost, listManifestProjects, listRoutes, prefixSize, readManifest, readPreviewBases } from '@shipzy/core';
 import { StackOutputs } from './aws.js';
 
 export interface LiveHost {

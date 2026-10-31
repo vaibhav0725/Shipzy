@@ -1,4 +1,4 @@
-import { BuildEnvVar, buildEnvVars, EnvScope, readManifest } from '@deployer/core';
+import { BuildEnvVar, buildEnvVars, EnvScope, readManifest } from '@shipzy/core';
 import { missingParams } from './ssm.js';
 
 /**

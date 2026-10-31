@@ -9,10 +9,10 @@ import { assetPath } from './assets.js';
 // into ~/.shipzy/dashboard-app the first time it is wanted, so people who only use the CLI never download it.
 // Inside this repository the build leaves a copy in assets/dashboard, which is used as is.
 
-declare const __DEPLOYER_VERSION__: string | undefined;
+declare const __SHIPZY_VERSION__: string | undefined;
 declare const __DASHBOARD_PACKAGE__: string | undefined;
 
-const version = typeof __DEPLOYER_VERSION__ === 'undefined' ? undefined : __DEPLOYER_VERSION__;
+const version = typeof __SHIPZY_VERSION__ === 'undefined' ? undefined : __SHIPZY_VERSION__;
 const packageName = typeof __DASHBOARD_PACKAGE__ === 'undefined' ? 'shipzy-dashboard' : __DASHBOARD_PACKAGE__;
 
 /** Where the optional package is installed. */
@@ -33,7 +33,7 @@ function installedVersion(): string | undefined {
 
 /** The dashboard server file to run, if one is available and matches this CLI's version. */
 export function locateDashboard(): string | undefined {
-  const override = process.env.DEPLOYER_DASHBOARD_DIR;
+  const override = process.env.SHIPZY_DASHBOARD_DIR;
   if (override) return fs.existsSync(path.join(override, SERVER)) ? path.join(override, SERVER) : undefined;
   const bundled = path.join(assetPath('dashboard'), SERVER);
   if (fs.existsSync(bundled)) return bundled;
@@ -70,9 +70,9 @@ export async function installDashboard(): Promise<string> {
   const dir = installDir();
   fs.mkdirSync(dir, { recursive: true });
   const manifest = path.join(dir, 'package.json');
-  if (!fs.existsSync(manifest)) fs.writeFileSync(manifest, JSON.stringify({ name: 'deployer-dashboard-app', private: true }) + '\n');
-  // DEPLOYER_DASHBOARD_PACKAGE lets a local tarball or another version be used (testing, offline installs).
-  const spec = process.env.DEPLOYER_DASHBOARD_PACKAGE ?? `${packageName}@${version ?? 'latest'}`;
+  if (!fs.existsSync(manifest)) fs.writeFileSync(manifest, JSON.stringify({ name: 'shipzy-dashboard-app', private: true }) + '\n');
+  // SHIPZY_DASHBOARD_PACKAGE lets a local tarball or another version be used (testing, offline installs).
+  const spec = process.env.SHIPZY_DASHBOARD_PACKAGE ?? `${packageName}@${version ?? 'latest'}`;
   console.log(`Installing the dashboard (${spec}) into ${dir} ...`);
   await runNpm(['install', '--prefix', dir, '--no-audit', '--no-fund', '--loglevel=error', spec]);
   restoreModules(path.join(packageDir(), 'app'));

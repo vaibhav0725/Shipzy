@@ -36,7 +36,7 @@ export default function Security() {
             <li>CloudFront, CodeBuild, certificates, Route 53 records, and the stack’s own parameters and two secrets;</li>
             <li>nothing else: not your other buckets, not other IAM users or access keys, not other services.</li>
           </ul>
-          <p><a href="/iam/deployer-cli-policy.json">Download the policy</a> and <a href="/iam/create-limited-user.sh">the script</a>, and read them before you run anything. We checked the policy with the AWS policy simulator, and by running setup, deploys (local, remote and GitHub), domains, rollback, delete and destroy with a user that has only this policy.</p>
+          <p><a href="/iam/shipzy-cli-policy.json">Download the policy</a> and <a href="/iam/create-limited-user.sh">the script</a>, and read them before you run anything. We checked the policy with the AWS policy simulator, and by running setup, deploys (local, remote and GitHub), domains, rollback, delete and destroy with a user that has only this policy.</p>
           <p>Inside the stack, three roles do the work, and each can only reach this stack’s own resources:</p>
           <div className="table-wrap">
             <table>

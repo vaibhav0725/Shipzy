@@ -431,6 +431,7 @@ by default.
 
 ```sh
 shipzy status        # account, stack, URL, build setup, last build, totals
+shipzy cost          # this month so far and projected, from CloudWatch usage and list prices (an estimate)
 shipzy list          # every project: where it is live, how old, auto-deploy source, versions, size
 shipzy list -p my-app
 ```
@@ -525,10 +526,10 @@ One-time setup (about two minutes, free). Until it is done, the page shows these
 
 1. On github.com open **Settings → Developer settings → OAuth Apps → New OAuth App**
    (direct link: `github.com/settings/applications/new`).
-2. Name: anything (for example `Deployer`). Homepage URL and Authorization callback URL: `http://127.0.0.1`.
+2. Name: anything (for example `Shipzy`). Homepage URL and Authorization callback URL: `http://127.0.0.1`.
 3. Register it, then tick **Enable Device Flow** and save. Do **not** generate a client secret; it is not needed.
 4. Copy the **Client ID** (it is not a secret) and paste it into the box on the page, then **Save**. It is remembered in
-   `~/.shipzy/dashboard.json`, so this is done once. (Setting `DEPLOYER_GITHUB_CLIENT_ID` in the environment works too
+   `~/.shipzy/dashboard.json`, so this is done once. (Setting `SHIPZY_GITHUB_CLIENT_ID` in the environment works too
    and takes precedence.)
 
 What it does with the login:
@@ -752,6 +753,11 @@ or, outside a git repository, a directory walk using the root `.gitignore`. Thes
 is roughly 40 cents a month for each of the two secrets. Check current AWS pricing for your usage. The CLI's retention
 settings keep S3 storage bounded.
 
+`shipzy cost` estimates this month's bill from CloudWatch usage and list prices, and `shipzy init --budget 25
+--budget-email you@example.com` creates an AWS Budget that emails you at 80% and 100% of the amount and when AWS forecasts
+you will pass it. AWS has no spending cap, so both only warn. Existing least-privilege users pick up the extra permissions
+(`cloudwatch:GetMetricData`, a budget named `Deployer*`) by re-running `docs/iam/create-limited-user.sh` with an admin profile.
+
 ---
 
 ## 9. Security model
@@ -859,7 +865,7 @@ table uses a pure-JavaScript implementation, so nothing native is installed or s
   it installs the package. Its version must equal the CLI's.
 - Both are `private` until a package name is chosen. The CLI finds the dashboard package's name from
   `apps/dashboard/package.json`, so renaming it there is enough. To test an install before publishing, set
-  `DEPLOYER_DASHBOARD_PACKAGE=<path to the tarball>`.
+  `SHIPZY_DASHBOARD_PACKAGE=<path to the tarball>`.
 
 **Conventions worth knowing**
 

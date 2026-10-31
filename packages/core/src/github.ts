@@ -24,7 +24,7 @@ function request<T>(token: string | undefined, method: string, path: string, bod
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
           Accept: 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28',
-          'User-Agent': 'deployer-cli',
+          'User-Agent': 'shipzy-cli',
           ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {}),
         },
         timeout: 20_000,

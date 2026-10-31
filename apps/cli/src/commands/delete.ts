@@ -13,7 +13,7 @@ import {
   readManifest,
   readPreviewBases,
   isPreviewHost,
-} from '@deployer/core';
+} from '@shipzy/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { confirmByTyping } from '../lib/prompt.js';
 import { removeDomain } from '../lib/domains.js';

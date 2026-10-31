@@ -22,7 +22,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{var q=new URLSearchParams(location.search).get('theme');if(q==='light'||q==='dark'||q==='system')localStorage.setItem('deployer-theme',q);var t=localStorage.getItem('deployer-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}",
+              "try{var q=new URLSearchParams(location.search).get('theme');if(q==='light'||q==='dark'||q==='system')localStorage.setItem('shipzy-theme',q);var t=localStorage.getItem('shipzy-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}",
           }}
         />
       </head>

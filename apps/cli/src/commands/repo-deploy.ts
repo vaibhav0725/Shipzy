@@ -11,7 +11,7 @@ import {
   readManifest,
   resolveTargetHosts,
   startBuild,
-} from '@deployer/core';
+} from '@shipzy/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { projectBuildEnv } from '../lib/build-env.js';
 import { parseKeep } from '../lib/project.js';

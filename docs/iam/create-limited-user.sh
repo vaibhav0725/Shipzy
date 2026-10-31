@@ -17,7 +17,7 @@ echo "Account $ACCOUNT"
 
 DOC="$(mktemp)"
 trap 'rm -f "$DOC"' EXIT
-sed "s/ACCOUNT_ID/$ACCOUNT/g" "$HERE/deployer-cli-policy.json" > "$DOC"
+sed "s/ACCOUNT_ID/$ACCOUNT/g" "$HERE/shipzy-cli-policy.json" > "$DOC"
 
 POLICY_ARN="arn:aws:iam::$ACCOUNT:policy/$POLICY_NAME"
 if aws iam get-policy --policy-arn "$POLICY_ARN" > /dev/null 2>&1; then

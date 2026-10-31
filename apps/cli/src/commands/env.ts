@@ -8,7 +8,7 @@ import {
   envParamPath,
   readManifest,
   updateManifest,
-} from '@deployer/core';
+} from '@shipzy/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { parseDotenv } from '../lib/dotenv.js';
 import { table } from '../lib/format.js';

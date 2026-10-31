@@ -12,7 +12,7 @@ import {
   setMode,
   setRoute,
   updateManifest,
-} from '@deployer/core';
+} from '@shipzy/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { build } from '../lib/build.js';
 import { parseKeep, resolveProject } from '../lib/project.js';

@@ -1,5 +1,5 @@
 import { ui } from '../lib/ui.js';
-import { assertProjectName, prune } from '@deployer/core';
+import { assertProjectName, prune } from '@shipzy/core';
 import { getOutputs, GlobalOptions } from '../lib/aws.js';
 
 export interface PruneCommandOptions {

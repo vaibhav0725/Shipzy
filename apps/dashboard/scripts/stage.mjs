@@ -1,7 +1,7 @@
 // After `next build`, stages the self-contained server twice:
-//  - apps/cli/assets/dashboard: used when running from this repository (`deployer dashboard` finds it there; the
+//  - apps/cli/assets/dashboard: used when running from this repository (`shipzy dashboard` finds it there; the
 //    published CLI package leaves it out);
-//  - apps/dashboard/dist-package: the optional package people install on demand (`deployer dashboard` offers to).
+//  - apps/dashboard/dist-package: the optional package people install on demand (`shipzy dashboard` offers to).
 // Next's standalone output leaves out the static files, so add those too.
 import * as fs from 'node:fs';
 import * as path from 'node:path';

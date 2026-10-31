@@ -26,7 +26,7 @@ export function cliCommand(args: string[]): { file: string; argv: string[] } {
 export function childEnv(extra?: Record<string, string>): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
   for (const name of Object.keys(env)) {
-    if (name === 'NODE_ENV' || name === 'PORT' || name === 'HOSTNAME' || name.startsWith('NEXT_') || name.startsWith('__NEXT_') || name.startsWith('DEPLOYER_DASH')) {
+    if (name === 'NODE_ENV' || name === 'PORT' || name === 'HOSTNAME' || name.startsWith('NEXT_') || name.startsWith('__NEXT_') || name.startsWith('SHIPZY_DASH')) {
       delete env[name];
     }
   }
@@ -44,8 +44,8 @@ interface Entry {
   value?: unknown;
   refreshing?: Promise<unknown>;
 }
-const g = globalThis as unknown as { __deployerCache?: Map<string, Entry> };
-const cache = (g.__deployerCache ??= new Map<string, Entry>());
+const g = globalThis as unknown as { __shipzyCache?: Map<string, Entry> };
+const cache = (g.__shipzyCache ??= new Map<string, Entry>());
 
 /** After a change (a finished job), what was read before may be wrong: drop it and read the common pages again. */
 export function clearCache(): void {

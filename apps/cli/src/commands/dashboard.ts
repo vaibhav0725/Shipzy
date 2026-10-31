@@ -75,11 +75,11 @@ export async function dashboard(opts: DashboardOptions, global: GlobalOptions): 
       // Next's standalone server reads these. Listen on this machine only.
       HOSTNAME: '127.0.0.1',
       PORT: String(port),
-      DEPLOYER_DASH_TOKEN: token,
+      SHIPZY_DASH_TOKEN: token,
       ...(opts.demo ? { SHIPZY_DEMO: '1' } : {}),
-      DEPLOYER_CLI: cli,
-      DEPLOYER_CWD: process.cwd(),
-      DEPLOYER_GLOBALS: JSON.stringify({ profile: global.profile, region: process.env.AWS_REGION, stackName: global.stackName }),
+      SHIPZY_CLI: cli,
+      SHIPZY_CWD: process.cwd(),
+      SHIPZY_GLOBALS: JSON.stringify({ profile: global.profile, region: process.env.AWS_REGION, stackName: global.stackName }),
     },
   });
 
