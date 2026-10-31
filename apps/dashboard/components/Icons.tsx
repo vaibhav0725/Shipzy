@@ -46,11 +46,12 @@ export function Icon({ name, size }: { name: IconName; size?: number }) {
   );
 }
 
-/** The brand mark: an ember square with a rising triangle (a deploy going up). */
+/** The shipzy mark: an outlined square with an ember square on top. The outline follows the theme (ink on paper, paper on ink). */
 export function Logo() {
   return (
-    <span className="mark" aria-hidden="true">
-      <svg viewBox="0 0 28 28"><path d="M14 5.5 22.5 21h-17Z" /></svg>
-    </span>
+    <svg className="mark" viewBox="0 0 100 100" aria-hidden="true">
+      <rect x="6.25" y="35.75" width="58.5" height="58" fill="none" stroke="var(--text)" strokeWidth="12.5" />
+      <rect x="33" y="0" width="66.5" height="66.5" fill="#E8693A" />
+    </svg>
   );
 }
