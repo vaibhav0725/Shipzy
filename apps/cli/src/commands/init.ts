@@ -34,7 +34,7 @@ export async function init(opts: GlobalOptions): Promise<void> {
     console.warn(`${uiErr.yellow(uiErr.bold('Warning:'))} you are using root credentials. Prefer an IAM user or SSO profile.`);
   }
 
-  for (const name of ['template.json', 'engine.zip', 'build.sh']) {
+  for (const name of ['template.json', 'engine.zip', 'build.sh', 'not-found.html']) {
     if (!fs.existsSync(asset(name))) throw new Error(`${name} is missing; run \`npm run build\` at the repo root.`);
   }
   const templateBody = fs.readFileSync(asset('template.json'), 'utf8');
@@ -86,6 +86,24 @@ export async function init(opts: GlobalOptions): Promise<void> {
         Body: buildScript,
         ContentType: 'text/x-shellscript',
         Metadata: { sha256: scriptSha },
+      }),
+    );
+  }
+
+  // The page CloudFront falls back to for a path with no file (see the stack's error responses), kept at the root of
+  // the sites bucket where no project folder can collide with it.
+  const notFound = fs.readFileSync(asset('not-found.html'));
+  const notFoundSha = createHash('sha256').update(notFound).digest('hex');
+  const storedNotFound = await client.send(new HeadObjectCommand({ Bucket: out.bucket, Key: '404.html' })).catch(() => undefined);
+  if (storedNotFound?.Metadata?.['sha256'] !== notFoundSha) {
+    await client.send(
+      new PutObjectCommand({
+        Bucket: out.bucket,
+        Key: '404.html',
+        Body: notFound,
+        ContentType: 'text/html; charset=utf-8',
+        CacheControl: 'public, max-age=300',
+        Metadata: { sha256: notFoundSha },
       }),
     );
   }

@@ -30,17 +30,41 @@ function readPackage(dir: string): { name?: string; scripts?: Record<string, str
 
 const sanitize = (s: string) => s.toLowerCase().replace(/^@[^/]+\//, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63);
 
+/** Does next.config ask for a static export? (A hint; the CLI repeats the check, and more, when you deploy.) */
+function hasStaticExport(dir: string): boolean {
+  for (const name of ['next.config.mjs', 'next.config.js', 'next.config.ts', 'next.config.cjs', 'next.config.mts']) {
+    try {
+      const text = fs.readFileSync(path.join(dir, name), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+      return /\boutput\s*:\s*(['"`])export\1/.test(text);
+    } catch {
+      /* try the next file name */
+    }
+  }
+  return false;
+}
+
 /** A hint only; the CLI does the real detection (and refusal) when you deploy. */
 function describe(dir: string): FolderListing['project'] {
   const pkg = readPackage(dir);
   if (!pkg) return undefined;
   const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-  const framework = deps.next ? 'Next.js' : deps.vite ? 'Vite' : deps['react-scripts'] ? 'Create React App' : deps.react ? 'React (unknown tooling)' : 'not a React project';
+  const nextStatic = Boolean(deps.next) && hasStaticExport(dir);
+  const framework = deps.next
+    ? nextStatic
+      ? 'Next.js (static export)'
+      : "Next.js without output: 'export'"
+    : deps.vite
+      ? 'Vite'
+      : deps['react-scripts']
+        ? 'Create React App'
+        : deps.react
+          ? 'React (unknown tooling)'
+          : 'not a React project';
   return {
     name: pkg.name ?? path.basename(dir),
     suggestedProject: sanitize(pkg.name ?? path.basename(dir)) || 'my-app',
     framework,
-    supported: !deps.next && Boolean(deps.react) && Boolean(deps.vite || deps['react-scripts']),
+    supported: deps.next ? nextStatic : Boolean(deps.react) && Boolean(deps.vite || deps['react-scripts']),
     hasBuildScript: Boolean(pkg.scripts?.build),
   };
 }

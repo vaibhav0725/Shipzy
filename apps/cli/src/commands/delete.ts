@@ -2,6 +2,7 @@ import { ui } from '../lib/ui.js';
 import {
   assertProjectName,
   deleteManifest,
+  deleteMode,
   deletePrefix,
   deleteRoute,
   envParamPrefix,
@@ -73,6 +74,7 @@ export async function deleteProject(opts: DeleteOptions, global: GlobalOptions):
   // The project's own address: its route is gone, so the distribution can go too.
   if (await removeProjectSite(global, project)) console.log(`Removed the project's own CloudFront address ${manifest.siteHost ?? ''}.`.replace(' .', '.'));
   const objects = await deletePrefix(out.bucket, `${project}/`);
+  for (const id of folders) await deleteMode(out.kvsArn, `${project}/${id}`).catch(() => undefined);
   if (out.buildsBucket) await deletePrefix(out.buildsBucket, `src/${project}/`);
   await deleteParamsUnder(envParamPrefix(global.stackName, project));
 

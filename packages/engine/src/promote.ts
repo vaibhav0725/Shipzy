@@ -9,6 +9,7 @@ import {
   resolveTargetHosts,
   routeTarget,
   s3,
+  setMode,
   setRoute,
   updateManifest,
 } from '@deployer/core';
@@ -34,6 +35,9 @@ export interface PromoteEvent {
   keep?: number;
   /** number of files the build uploaded */
   files: number;
+  /** what the project was built as, and how the edge must serve it (see core's framework.ts) */
+  framework?: string;
+  routing?: 'html' | 'dir';
 }
 
 const ID_RE = /^d-\d{8}T\d{6}-[0-9a-f]{6}$/;
@@ -79,6 +83,8 @@ async function promoteProduction(event: PromoteEvent) {
 
   try {
     await assertUploaded(site.bucket, target);
+    // The routing style first: a host must never point at a multi-page site while the router still treats it as a SPA.
+    if (event.routing) await setMode(site.kvsArn, target, event.routing);
     for (const host of hosts) await setRoute(site.kvsArn, host, target);
   } catch (err) {
     await discardUpload(site, hosts, target);
@@ -87,7 +93,7 @@ async function promoteProduction(event: PromoteEvent) {
 
   await updateManifest(site.bucket, event.project, (m) => {
     if (!m.deployments.some((d) => d.id === event.id)) {
-      m.deployments.push({ id: event.id, createdAt: new Date().toISOString(), files: event.files });
+      m.deployments.push({ id: event.id, createdAt: new Date().toISOString(), files: event.files, framework: event.framework, routing: event.routing });
     }
     for (const host of hosts) m.live[host] = event.id;
   });

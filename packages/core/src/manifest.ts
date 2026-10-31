@@ -13,6 +13,10 @@ export interface Deployment {
   files: number;
   /** the pull request this deployment is a preview of; absent for production deployments */
   preview?: number;
+  /** what the project was built as (e.g. "vite", "next-static"); absent on older deployments */
+  framework?: string;
+  /** how the edge serves it when it is a multi-page static site; absent for a single-page app */
+  routing?: 'html' | 'dir';
 }
 
 /** The live preview of one open pull request. */

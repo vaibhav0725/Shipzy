@@ -23,6 +23,18 @@ await build({
   logLevel: 'warning',
 });
 
+// The framework detection also runs inside the AWS build script: bundle a standalone copy (see build.sh).
+await build({
+  entryPoints: [path.join(repoRoot, 'packages/core/src/framework-cli.ts')],
+  outfile: path.join(repoRoot, 'apps/cli/assets/detect.cjs'),
+  bundle: true,
+  platform: 'node',
+  target: 'node20',
+  format: 'cjs',
+  legalComments: 'none',
+  logLevel: 'warning',
+});
+
 const mtime = new Date(Date.UTC(2020, 0, 1));
 const entries = { 'index.mjs': fs.readFileSync(path.join(dist, 'index.mjs')) };
 const zipped = zipSync(

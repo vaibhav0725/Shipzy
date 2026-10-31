@@ -11,6 +11,8 @@ apps/cli/assets/engine.zip
 apps/cli/assets/build.sh
 apps/cli/assets/domain-template.json
 apps/cli/assets/site-template.json
+apps/cli/assets/not-found.html
+apps/cli/assets/detect.cjs
 apps/cli/assets/dashboard/
 apps/dashboard/.next/
 apps/dashboard/dist-package/

@@ -1,4 +1,4 @@
-import { getRoute } from './kvs.js';
+import { deleteMode, getRoute } from './kvs.js';
 import { deletePrefix } from './objects.js';
 import { SiteRefs } from './types.js';
 
@@ -12,6 +12,7 @@ export async function discardUpload(site: SiteRefs, hosts: string | string[], ta
       if ((await getRoute(site.kvsArn, host)) === target) return 'kept-live';
     }
     await deletePrefix(site.bucket, `${target}/`);
+    await deleteMode(site.kvsArn, target).catch(() => undefined);
     return 'removed';
   } catch {
     return 'failed';

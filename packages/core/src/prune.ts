@@ -1,5 +1,5 @@
 import { idTimestamp } from './ids.js';
-import { listRouteTargets } from './kvs.js';
+import { deleteMode, listRouteTargets } from './kvs.js';
 import { readManifest, routeTarget, updateManifest } from './manifest.js';
 import { deletePrefix, listDeploymentIds } from './objects.js';
 import { SiteRefs } from './types.js';
@@ -57,6 +57,7 @@ export async function prune(out: SiteRefs, project: string, opts: PruneOptions):
   }
   for (const id of [...expired, ...orphans]) {
     await deletePrefix(out.bucket, `${routeTarget(project, id)}/`);
+    await deleteMode(out.kvsArn, routeTarget(project, id)).catch(() => undefined);
   }
   return { expired, orphans };
 }

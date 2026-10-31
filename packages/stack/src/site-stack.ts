@@ -42,6 +42,13 @@ export class SiteStack extends cdk.Stack {
         httpVersion: 'http2',
         ipv6Enabled: true,
         viewerCertificate: { cloudFrontDefaultCertificate: true },
+        // A missing file is a 403 from the private bucket. Show the site's own 404.html with a real 404 status.
+        customErrorResponses: [403, 404].map((errorCode) => ({
+          errorCode,
+          responseCode: 404,
+          responsePagePath: '/404.html',
+          errorCachingMinTtl: 0,
+        })),
         origins: [
           {
             id: 'sites',

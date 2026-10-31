@@ -1,6 +1,5 @@
 import * as path from 'node:path';
-import { assertProjectName } from '@deployer/core';
-import { readPackageJson } from './build.js';
+import { assertProjectName, readPackageJson } from '@deployer/core';
 
 const sanitize = (s: string) =>
   s.toLowerCase().replace(/^@[^/]+\//, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');

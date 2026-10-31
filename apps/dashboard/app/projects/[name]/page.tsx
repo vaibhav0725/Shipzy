@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useState } from 'react';
 import { Avatar, Badge, Confirm, CopyButton, ErrorNotice, StatusBadge } from '@/components/bits';
 import { Icon } from '@/components/Icons';
-import { BuildRow, DomainRow, EnvRow, Manifest, PreviewsInfo, siteUrl, startAction, timeAgo, useApi } from '@/lib/client';
+import { BuildRow, DomainRow, EnvRow, frameworkLabel, Manifest, PreviewsInfo, siteUrl, startAction, timeAgo, useApi } from '@/lib/client';
 
 type Tab = 'deployments' | 'domains' | 'environment' | 'github' | 'previews' | 'builds';
 const TABS: { id: Tab; label: string }[] = [
@@ -76,6 +76,7 @@ export default function ProjectPage() {
                   {liveHosts.length ? 'Live' : 'Offline'}
                 </Badge>
               ) : null}
+              {frameworkLabel(latest?.framework) && <Badge>{frameworkLabel(latest?.framework)}</Badge>}
               {m?.source && (
                 <a className="small muted row" style={{ gap: 5 }} href={`https://github.com/${m.source.repo}`} target="_blank" rel="noreferrer">
                   <Icon name="github" size={14} />

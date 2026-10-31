@@ -18,8 +18,19 @@ fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, JSON.stringify(template) + '\n');
 console.log(`Wrote ${path.relative(process.cwd(), out)}`);
 
-// The build script is uploaded to the Builds bucket by `deployer init`, so it travels with the CLI.
-fs.copyFileSync(path.resolve(__dirname, '../edge/build.sh'), path.resolve(path.dirname(out), 'build.sh'));
+// The build script is uploaded to the Builds bucket by `deployer init`, so it travels with the CLI. The framework
+// detection (packages/core/src/framework.ts, bundled by the engine build) is embedded in it, so the script stays one file.
+const detect = fs.readFileSync(path.resolve(path.dirname(out), 'detect.cjs'), 'utf8');
+if (detect.split('\n').includes('DETECT_EOF')) throw new Error('detect.cjs contains the heredoc terminator.');
+const buildScript = fs.readFileSync(path.resolve(__dirname, '../edge/build.sh'), 'utf8');
+if (!buildScript.includes('# @@DETECT_JS@@')) throw new Error('build.sh has no # @@DETECT_JS@@ placeholder.');
+fs.writeFileSync(
+  path.resolve(path.dirname(out), 'build.sh'),
+  buildScript.replace('# @@DETECT_JS@@', () => `cat > /tmp/detect.cjs <<'DETECT_EOF'\n${detect.trimEnd()}\nDETECT_EOF`),
+);
+
+// The fallback 404 page `deployer init` puts at the root of the sites bucket.
+fs.copyFileSync(path.resolve(__dirname, '../edge/not-found.html'), path.resolve(path.dirname(out), 'not-found.html'));
 
 // One custom domain = one small stack of its own; the CLI fills in the parameters.
 const domainApp = new cdk.App({ analyticsReporting: false });

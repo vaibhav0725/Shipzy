@@ -27,13 +27,13 @@ the CLI on your machine.
 
 ## 1. What it is, and what it is not
 
-**It is** a tool that deploys static React apps (Vite or Create React App) to infrastructure you own:
+**It is** a tool that deploys static React apps (Vite, Create React App) and static exports of Next.js to infrastructure you own:
 
 - You keep your AWS bill, your data and your credentials. The tool is a thin layer of code and AWS resources.
 - A deploy produces an immutable copy of your site. Going live, and going back, is a single small update.
 - You can build on your own machine (fast) or inside your AWS account (reproducible, and needed for GitHub).
 
-**It is not (yet)**: a hosted service, a dashboard you can open from anywhere (there is a local one, section 5.10), or a Next.js host. See
+**It is not (yet)**: a hosted service, a dashboard you can open from anywhere (there is a local one, section 5.10), or a host for server-rendered Next.js (static exports work, section 7). See
 [section 13](#13-status-and-roadmap).
 
 ---
@@ -138,7 +138,8 @@ of truth for what can be rolled back to.
 ## 3. Features
 
 **Deploying**
-- Local deploys of Vite and Create React App projects; automatic package-manager detection (npm, pnpm, yarn).
+- Local deploys of Vite and Create React App projects, and static exports of Next.js (`output: 'export'`); automatic
+  package-manager detection (npm, pnpm, yarn).
 - Remote builds in CodeBuild in your own account, with the log streamed to your terminal.
 - Automatic deploys on `git push`, per project, per branch.
 - Override the install or build step (for example `--install-command "npm ci --legacy-peer-deps"`).
@@ -665,8 +666,9 @@ If the dashboard is not installed, the command asks whether to download it (or p
 ## 7. What your project needs
 
 - A `react` dependency and a `build` script in `package.json`.
-- A **Vite** or **Create React App** project. The build output must be `dist/` or `build/` and contain `index.html`.
-- **Next.js is rejected** with a clear message, before anything is queued or built.
+- A **Vite** or **Create React App** project (a single-page app). The build output must be `dist/` or `build/` and contain `index.html`.
+- Or a **Next.js project set up for a static export** (below). Anything else Next.js is refused with a clear message,
+  before anything is queued or built.
 - Routes that work from the site root, such as React Router's `BrowserRouter`. A Vite `base` or a CRA `homepage`
   pointing at a sub-path will break asset loading.
 - **Environment variables are baked in at build time.** For a local deploy they come from your local `.env`. Remote
@@ -674,6 +676,29 @@ If the dashboard is not installed, the command asks whether to download it (or p
   Never put secrets in variables your framework exposes to the browser: they end up in public JavaScript.
 - Calls to your own backend need CORS to allow your site's URL.
 - Project names use lowercase letters, digits and dashes, start with a letter or digit, and are at most 63 characters.
+
+**Next.js (static export).** Next.js can only be deployed as files, because no server runs on this platform. In
+`next.config` set:
+
+```js
+export default { output: 'export', images: { unoptimized: true } };
+```
+
+Then `next build` writes the whole site, one HTML file per page, to `out/`, and `deployer deploy` uploads that. Both the
+App Router and the Pages Router work, and dynamic routes work when they list their pages (`generateStaticParams` or
+`getStaticPaths`). Pages are pre-rendered at build time; they still run in the browser after loading.
+
+What a static export cannot do, and `deployer` refuses up front rather than deploying a site that behaves differently:
+middleware (`middleware.ts`, `proxy.ts`), API routes (`pages/api`), `getServerSideProps`, per-request rendering,
+revalidation (ISR), and Next's image resizing (hence `images.unoptimized`). `redirects`, `rewrites` and `headers` in
+`next.config` are ignored by a static export. Route handlers that only answer `GET` are built to files and work.
+Environment variables named `NEXT_PUBLIC_*` are baked in at build time exactly like `VITE_*` (section 5.4).
+
+How the edge serves it: a single-page app answers every path with `index.html`; a Next.js export answers `/about` with
+`about.html` (or `about/index.html` when `trailingSlash: true`), redirects `/about/` to `/about` (or the reverse with
+trailing slashes) as Next.js does, and serves the paths of the files it has. A path with no file gets a 404 with the
+site's own `404.html`. Each deployment records which style it uses (a small `mode:` entry in the routing table, removed
+when the deployment is deleted), so rolling back across the two kinds of project works.
 
 **Package manager detection** (local and remote): `pnpm-lock.yaml` → `pnpm install --frozen-lockfile`;
 `yarn.lock` → `yarn install --frozen-lockfile`; `package-lock.json` → `npm ci`; otherwise `npm install`. Then
@@ -762,9 +787,13 @@ settings keep S3 storage bounded.
   wildcard domain is the one for previews (`--preview`).
 - **One preview domain is used per stack** (the first one registered); a preview name is `<project>-pr-<number>`, so
   the project name plus that must fit in 63 characters.
-- **Static React only.** No Next.js or server rendering.
+- **Static sites only.** Vite, Create React App and static Next.js exports. Server-rendered Next.js (API routes, middleware, per-request rendering) is not supported.
 - **Remote builds are slow to start** (about 1.5 minutes before your build begins).
-- **Missing files return a 403** XML page from S3 instead of a 404.
+- **A path with no file returns a real 404.** CloudFront falls back to a small page kept at the root of the sites
+  bucket (`deployer init` puts it there), and that page swaps itself for the site's own `404.html` when it has one (a
+  Next.js export does). Addresses and custom domains created before this was added keep the old plain 403 until they
+  are recreated (delete and redeploy the project, or `domain rm` and `domain add`); the stack's own default address
+  gets it on the next `deployer init`.
 - **A GitHub token is always required** to connect a repository, even a public one: it registers the webhook and is
   sent when cloning. One token serves a whole stack.
 - **Rollback reaches back 10 deployments by default** (`--keep` changes that).
@@ -788,7 +817,8 @@ settings keep S3 storage bounded.
 | `Repository … was not found, or the token cannot see it` | The token was not given access to that repository. |
 | `Could not fetch <repo> at <sha>` in a build log | The repository does not exist or the stored token cannot read it. Store a new token with `github connect`. |
 | `Build output not found: expected dist/index.html or build/index.html` | The build ran but produced no site. Check the project's build script and output folder. |
-| `Next.js is not supported yet` | Only static React projects work for now. |
+| `This is a Next.js project that is not set up for a static export` | Add `output: 'export'` (and `images: { unoptimized: true }`) to `next.config`. A project that needs a server cannot be deployed. |
+| `Image Optimization using the default loader is not compatible with export` | Add `images: { unoptimized: true }` to `next.config`. |
 | `deployer: command not found` | The link is gone or your PATH does not include npm's global bin folder (`npm prefix -g`). Run `npm link` again in `apps/cli`. |
 | `Stack "Deployer" not found. Run deployer init first.` | The stack does not exist in this account and region, or you are using a different `--profile`, `--region` or `--stack-name`. |
 | `domain add` says the hostname is already used by another CloudFront distribution | A hostname can be attached to one distribution only. Remove it from the other distribution (or its stack) first, then rerun. |
@@ -867,6 +897,6 @@ table uses a pure-JavaScript implementation, so nothing native is installed or s
 1. **A least-privilege policy** for the person running the CLI, before any public release.
 2. **A hosted or self-hosted dashboard** that connects to your AWS account (a cross-account role, with no raw keys).
    The local dashboard (section 5.10) already exists and would be the base for it.
-3. **Other static frameworks** (Vue, Svelte, Astro static), then **server-rendered frameworks** such as Next.js.
+3. **Server-rendered Next.js** (a server running in your account), and **other static frameworks** (Vue, Svelte, Astro static).
 
 License: Apache-2.0.

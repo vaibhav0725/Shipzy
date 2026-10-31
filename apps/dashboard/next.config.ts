@@ -8,6 +8,9 @@ const config: NextConfig = {
   outputFileTracingRoot: path.join(import.meta.dirname, '../../'),
   // Local tool: no gzip, so the live job logs (server-sent events) are never held back by a buffer.
   compress: false,
+  // Reading project folders by a path chosen at runtime makes Next's tracer pull in whole folders. Keep our own
+  // build outputs (and the CLI package that embeds them) out of the standalone server.
+  outputFileTracingExcludes: { '*': ['**/dist-package/**', '**/.next/cache/**', 'apps/cli/**', 'packages/**', 'docs/**'] },
   poweredByHeader: false,
   reactStrictMode: true,
   // Do not let `next dev` write an AGENTS.md into the project.

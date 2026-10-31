@@ -18,7 +18,7 @@ export interface ProjectSummary {
 }
 export interface Manifest {
   project: string;
-  deployments: { id: string; createdAt: string; files: number; preview?: number }[];
+  deployments: { id: string; createdAt: string; files: number; preview?: number; framework?: string; routing?: string }[];
   live: Record<string, string>;
   source?: { type: 'github'; repo: string; branch: string; host?: string; installCommand?: string; buildCommand?: string; previews?: boolean };
   env?: { production: string[]; preview: string[] };
@@ -126,3 +126,7 @@ export function timeAgo(iso?: string): string {
 }
 
 export const siteUrl = (host: string) => `https://${host}`;
+
+/** What a deployment was built as, for display. */
+export const frameworkLabel = (id?: string): string | undefined =>
+  ({ vite: 'Vite', 'create-react-app': 'Create React App', react: 'React', 'next-static': 'Next.js (static export)' } as Record<string, string>)[id ?? ''];

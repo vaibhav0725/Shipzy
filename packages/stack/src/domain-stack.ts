@@ -50,6 +50,13 @@ export class DomainStack extends cdk.Stack {
           sslSupportMethod: 'sni-only',
           minimumProtocolVersion: 'TLSv1.2_2021',
         },
+        // A missing file is a 403 from the private bucket; show /404.html from the bucket root with a 404 status.
+        customErrorResponses: [403, 404].map((errorCode) => ({
+          errorCode,
+          responseCode: 404,
+          responsePagePath: '/404.html',
+          errorCachingMinTtl: 0,
+        })),
         origins: [
           {
             id: 'sites',

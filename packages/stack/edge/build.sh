@@ -66,12 +66,9 @@ esac
 cd "$SRC"
 [ -f package.json ] || { echo "No package.json at the project root."; exit 1; }
 
-node -e '
-const pkg = require("./package.json");
-const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-if (deps.next) { console.error("Next.js is not supported yet: only static React (Vite / Create React App) projects."); process.exit(1); }
-if (!deps.react) { console.error("This does not look like a React project (no react dependency)."); process.exit(1); }
-'
+# The same framework detection the CLI uses (embedded here when the CLI is built).
+# @@DETECT_JS@@
+node /tmp/detect.cjs detect > /dev/null   # fails fast, with the reason, on a project that cannot be deployed
 
 if [ -f pnpm-lock.yaml ]; then
   PM=pnpm; INSTALL="pnpm install --frozen-lockfile"; corepack enable
@@ -86,24 +83,28 @@ fi
 echo "==> Installing: ${INSTALL_COMMAND:-$INSTALL}"
 bash -c "${INSTALL_COMMAND:-$INSTALL}"
 echo "==> Building: ${BUILD_COMMAND:-$PM run build}"
-bash -c "${BUILD_COMMAND:-$PM run build}"
+if ! bash -c "${BUILD_COMMAND:-$PM run build}" 2>&1 | tee /tmp/build.log; then
+  node /tmp/detect.cjs hint /tmp/build.log || true
+  echo
+  exit 1
+fi
 
-OUT=""
-for d in dist build; do
-  if [ -f "$d/index.html" ]; then OUT="$d"; break; fi
-done
-[ -n "$OUT" ] || { echo "Build output not found: expected dist/index.html or build/index.html."; exit 1; }
+RESOLVED="$(node /tmp/detect.cjs resolve)"   # prints the reason and fails when the output folder is missing
+OUT="$(echo "$RESOLVED" | jq -r .out)"
+FRAMEWORK="$(echo "$RESOLVED" | jq -r .framework)"
+ROUTING="$(echo "$RESOLVED" | jq -r .routing)"
 
 echo "==> Uploading $OUT to $DEST"
 UPLOADED=1
 # Same cache rules as the CLI: html always revalidates, hashed bundler output is immutable.
 aws s3 sync "$OUT" "$DEST/" --cache-control "public, max-age=3600" --only-show-errors
-for d in assets static; do
+for d in assets static _next/static; do
   if [ -d "$OUT/$d" ]; then
     aws s3 cp "$OUT/$d" "$DEST/$d" --recursive --cache-control "public, max-age=31536000, immutable" --only-show-errors
   fi
 done
-find "$OUT" -name '*.html' | while IFS= read -r f; do
+# Next.js page payloads (.txt) are not content-hashed, so they revalidate like html.
+find "$OUT" -not -path "$OUT/_next/*" \( -name '*.html' -o -name '*.txt' \) | while IFS= read -r f; do
   aws s3 cp "$f" "$DEST/${f#"$OUT"/}" --cache-control no-cache --only-show-errors
 done
 FILES="$(find "$OUT" -type f | wc -l | tr -d ' ')"
@@ -111,7 +112,9 @@ FILES="$(find "$OUT" -type f | wc -l | tr -d ' ')"
 echo "==> Promoting $DEPLOY_PROJECT/$DEPLOY_ID"
 PAYLOAD="$(jq -nc --arg project "$DEPLOY_PROJECT" --arg id "$DEPLOY_ID" --arg hosts "${DEPLOY_HOSTS:-}" \
   --argjson keep "${DEPLOY_KEEP:-10}" --argjson files "$FILES" --arg pr "${DEPLOY_PREVIEW_PR:-}" --arg sha "${SOURCE_REF:-}" \
-  '{action:"promote",project:$project,id:$id,hosts:(if $hosts == "" then null else ($hosts | split(",")) end),keep:$keep,files:$files}
+  --arg framework "$FRAMEWORK" --arg routing "$ROUTING" \
+  '{action:"promote",project:$project,id:$id,hosts:(if $hosts == "" then null else ($hosts | split(",")) end),keep:$keep,files:$files,framework:$framework}
+   + (if $routing == "" then {} else {routing:$routing} end)
    + (if $pr == "" then {} else {preview:{pr:($pr|tonumber),sha:$sha}} end)')"
 INVOKED=1
 aws lambda invoke --function-name "$ENGINE_FUNCTION" --cli-read-timeout 300 --cli-binary-format raw-in-base64-out \

@@ -93,6 +93,26 @@ export async function listRouteTargets(kvsArn: string): Promise<Set<string>> {
   return new Set((await listRoutes(kvsArn)).map((r) => r.target));
 }
 
+// How the edge serves a deployment's files. Absent means a single-page app (every path without an extension gets
+// /index.html); "html" and "dir" mean a multi-page static site (see framework.ts). One tiny key per deployment, read by
+// the router right after the host's route, so a rollback to an older deployment brings its own routing style along.
+const modeKey = (target: string) => `mode:${target}`;
+
+export async function setMode(kvsArn: string, target: string, routing: string): Promise<void> {
+  await writeWithEtag(kvsArn, (client, etag) =>
+    client.send(new PutKeyCommand({ KvsARN: kvsArn, Key: modeKey(target), Value: routing, IfMatch: etag })),
+  );
+}
+
+/** Forgets a deployment's routing style (when its files are deleted). Safe to repeat. */
+export async function deleteMode(kvsArn: string, target: string): Promise<void> {
+  try {
+    await writeWithEtag(kvsArn, (client, etag) => client.send(new DeleteKeyCommand({ KvsARN: kvsArn, Key: modeKey(target), IfMatch: etag })));
+  } catch (err) {
+    if ((err as { name?: string }).name !== 'ResourceNotFoundException') throw err;
+  }
+}
+
 export async function deleteRoute(kvsArn: string, host: string): Promise<void> {
   await writeWithEtag(kvsArn, (client, etag) =>
     client.send(new DeleteKeyCommand({ KvsARN: kvsArn, Key: `host:${host.toLowerCase()}`, IfMatch: etag })),

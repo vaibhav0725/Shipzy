@@ -11,12 +11,14 @@ function listFiles(root: string, dir = root): string[] {
   });
 }
 
-// HTML must always revalidate; bundler output in assets/ or static/ is content-hashed.
+// HTML must always revalidate; bundler output in assets/, static/ or _next/static/ is content-hashed. Next.js page
+// payloads (.txt) are not hashed and change with every build, so they revalidate like HTML.
 export function cacheControl(relPath: string): string {
   if (relPath.endsWith('.html')) return 'no-cache';
-  if (relPath.startsWith('assets/') || relPath.startsWith('static/')) {
+  if (relPath.startsWith('assets/') || relPath.startsWith('static/') || relPath.startsWith('_next/static/')) {
     return 'public, max-age=31536000, immutable';
   }
+  if (relPath.endsWith('.txt') && !relPath.startsWith('_next/')) return 'no-cache';
   return 'public, max-age=3600';
 }
 

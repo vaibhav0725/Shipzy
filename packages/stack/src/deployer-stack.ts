@@ -57,6 +57,14 @@ export class DeployerStack extends cdk.Stack {
     const distribution = new cloudfront.Distribution(this, 'Cdn', {
       comment: 'deployer static sites',
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
+      // A missing file is a 403 from the private bucket. CloudFront shows /404.html from the bucket root with a real 404
+      // status (`deployer init` puts a small page there; it shows the site's own 404.html when there is one).
+      errorResponses: [403, 404].map((httpStatus) => ({
+        httpStatus,
+        responseHttpStatus: 404,
+        responsePagePath: '/404.html',
+        ttl: cdk.Duration.seconds(0),
+      })),
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(bucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,

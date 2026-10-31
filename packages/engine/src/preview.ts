@@ -14,6 +14,7 @@ import {
   removePreview,
   routeTarget,
   s3,
+  setMode,
   setRoute,
   updateManifest,
   upsertComment,
@@ -29,6 +30,8 @@ export interface PreviewPromoteEvent {
   keep?: number;
   files: number;
   preview: { pr: number; sha: string };
+  framework?: string;
+  routing?: 'html' | 'dir';
 }
 
 export interface PreviewRemoveEvent {
@@ -108,6 +111,7 @@ export async function promotePreview(event: PreviewPromoteEvent) {
 
   try {
     await s3().send(new HeadObjectCommand({ Bucket: bucket, Key: `${target}/index.html` }));
+    if (event.routing) await setMode(kvsArn, target, event.routing);
     await setRoute(kvsArn, host, target);
   } catch (err) {
     await discardUpload({ bucket, kvsArn }, host, target);
@@ -115,7 +119,7 @@ export async function promotePreview(event: PreviewPromoteEvent) {
   }
 
   await updateManifest(bucket, event.project, (m) => {
-    m.deployments.push({ id: event.id, createdAt: new Date().toISOString(), files: event.files, preview: pr });
+    m.deployments.push({ id: event.id, createdAt: new Date().toISOString(), files: event.files, preview: pr, framework: event.framework, routing: event.routing });
     m.previews = { ...m.previews, [String(pr)]: { host, id: event.id, sha, updatedAt: new Date().toISOString() } };
   });
 

@@ -9,6 +9,7 @@ import {
   readManifest,
   resolveTargetHosts,
   routeTarget,
+  setMode,
   setRoute,
   updateManifest,
 } from '@deployer/core';
@@ -44,7 +45,7 @@ export async function deploy(dirArg: string, opts: DeployOptions, global: Global
   await ensureProjectSite(out, global, project, explicit);
   const hosts = await resolveTargetHosts(out, project, await readManifest(out.bucket, project), out.domain, explicit);
 
-  const { outDir, framework } = await build(dir, {
+  const { outDir, framework, frameworkId, routing } = await build(dir, {
     skipBuild: opts.skipBuild ?? false,
     installCommand: opts.installCommand,
     buildCommand: opts.buildCommand,
@@ -59,7 +60,8 @@ export async function deploy(dirArg: string, opts: DeployOptions, global: Global
   try {
     files = await uploadDirectory(out.bucket, target, outDir);
     console.log(ui.step(`Uploaded ${files} files as ${ui.dim(id)}`));
-    // Promote: edge routing first, then record it, so the manifest never claims more than is live.
+    // Promote: the routing style, then the edge routes, then record it, so the manifest never claims more than is live.
+    if (routing) await setMode(out.kvsArn, target, routing);
     for (const host of hosts) await setRoute(out.kvsArn, host, target);
   } catch (err) {
     const outcome = await discardUpload(out, hosts, target);
@@ -71,7 +73,7 @@ export async function deploy(dirArg: string, opts: DeployOptions, global: Global
   }
 
   await updateManifest(out.bucket, project, (m) => {
-    m.deployments.push({ id, createdAt: new Date().toISOString(), files });
+    m.deployments.push({ id, createdAt: new Date().toISOString(), files, framework: frameworkId, routing });
     for (const host of hosts) m.live[host] = id;
   });
 

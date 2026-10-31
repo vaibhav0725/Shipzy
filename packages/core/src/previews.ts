@@ -1,6 +1,6 @@
 import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { s3 } from './clients.js';
-import { deleteRoute, listRoutes } from './kvs.js';
+import { deleteMode, deleteRoute, listRoutes } from './kvs.js';
 import { readManifest, routeTarget, updateManifest, type Manifest } from './manifest.js';
 import { deletePrefix } from './objects.js';
 import { SiteRefs } from './types.js';
@@ -97,6 +97,9 @@ export async function removePreview(site: SiteRefs, project: string, pr: number)
     m.deployments = m.deployments.filter((d) => d.preview !== pr);
     if (info) delete m.live[info.host];
   });
-  for (const id of ids) await deletePrefix(site.bucket, `${routeTarget(project, id)}/`);
+  for (const id of ids) {
+    await deletePrefix(site.bucket, `${routeTarget(project, id)}/`);
+    await deleteMode(site.kvsArn, routeTarget(project, id)).catch(() => undefined);
+  }
   return true;
 }
