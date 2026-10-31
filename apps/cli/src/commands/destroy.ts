@@ -54,7 +54,7 @@ export async function destroy(opts: { yes?: boolean }, global: GlobalOptions): P
   if (failed.length > 0) {
     throw new Error(
       `Stopped before deleting the stack: ${failed.join(', ')} could not be removed. ` +
-        `Nothing else was deleted. Fix the cause, then run \`deployer destroy\` again (for a domain, \`deployer domain rm <host>\` also works).`,
+        `Nothing else was deleted. Fix the cause, then run \`shipzy destroy\` again (for a domain, \`shipzy domain rm <host>\` also works).`,
     );
   }
 

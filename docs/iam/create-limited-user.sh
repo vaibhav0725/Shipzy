@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Creates an IAM user that can run deployer and nothing else, and stores its access key in a local AWS profile.
+# Creates an IAM user that can run shipzy and nothing else, and stores its access key in a local AWS profile.
 # Run it ONCE with credentials that can manage IAM (your current admin profile):
 #
 #   AWS_PROFILE=<your-admin-profile> bash docs/iam/create-limited-user.sh [new-profile-name]
@@ -52,5 +52,5 @@ unset KEY
 
 echo
 echo "Done. Profile '$PROFILE_NAME' now belongs to the limited user."
-echo "Try it:   AWS_PROFILE=$PROFILE_NAME deployer status"
+echo "Try it:   AWS_PROFILE=$PROFILE_NAME shipzy status"
 echo "New keys take a few seconds to work."

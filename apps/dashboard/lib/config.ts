@@ -6,7 +6,7 @@ export interface Globals {
   stackName: string;
 }
 
-/** What `deployer dashboard` passes to this server through the environment. */
+/** What `shipzy dashboard` passes to this server through the environment. */
 export function settings() {
   let globals: Globals = { stackName: 'Deployer' };
   try {
@@ -16,7 +16,7 @@ export function settings() {
   }
   return {
     // In development (`next dev`) fall back to the CLI built in this repository.
-    cli: process.env.DEPLOYER_CLI ?? path.resolve(process.cwd(), '../cli/dist/deployer.mjs'),
+    cli: process.env.DEPLOYER_CLI ?? path.resolve(process.cwd(), '../cli/dist/shipzy.mjs'),
     cwd: process.env.DEPLOYER_CWD ?? process.env.HOME ?? process.cwd(),
     globals,
   };

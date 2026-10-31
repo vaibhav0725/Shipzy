@@ -37,16 +37,21 @@ const g = globalThis as unknown as { __deployerGithub?: State };
 const state: State = (g.__deployerGithub ??= { devices: new Map<string, Device>() });
 
 // The client ID comes from the environment, or from the dashboard's setup box (saved here so it is entered once).
-const CONFIG_FILE = path.join(os.homedir(), '.deployer', 'dashboard.json');
+const CONFIG_FILE = path.join(os.homedir(), '.shipzy', 'dashboard.json');
+// Before the tool was called shipzy it kept this file under ~/.deployer; keep reading it so a saved client ID survives.
+const LEGACY_CONFIG_FILE = path.join(os.homedir(), '.deployer', 'dashboard.json');
 const CLIENT_ID_RE = /^[A-Za-z0-9._-]{8,60}$/;
 
 function savedClientId(): string | undefined {
-  try {
-    const id = (JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')) as { githubClientId?: unknown }).githubClientId;
-    return typeof id === 'string' && CLIENT_ID_RE.test(id) ? id : undefined;
-  } catch {
-    return undefined;
+  for (const file of [CONFIG_FILE, LEGACY_CONFIG_FILE]) {
+    try {
+      const id = (JSON.parse(fs.readFileSync(file, 'utf8')) as { githubClientId?: unknown }).githubClientId;
+      if (typeof id === 'string' && CLIENT_ID_RE.test(id)) return id;
+    } catch {
+      /* try the next location */
+    }
   }
+  return undefined;
 }
 
 export const clientId = () => process.env.DEPLOYER_GITHUB_CLIENT_ID?.trim() || savedClientId();

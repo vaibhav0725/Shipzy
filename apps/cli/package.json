@@ -1,13 +1,13 @@
 {
-  "name": "@deployer/cli",
+  "name": "shipzy",
   "version": "0.1.0",
   "license": "Apache-2.0",
   "type": "module",
   "bin": {
-    "deployer": "dist/deployer.mjs"
+    "shipzy": "dist/shipzy.mjs"
   },
   "files": [
-    "dist/deployer.mjs",
+    "dist/shipzy.mjs",
     "assets",
     "!assets/dashboard"
   ],
@@ -38,7 +38,7 @@
     "typescript": "^7.0.2"
   },
   "private": true,
-  "description": "Deploy static React apps to your own AWS account (S3 + CloudFront)",
+  "description": "Deploy static React and Next.js sites to your own AWS account (S3 + CloudFront)",
   "engines": {
     "node": ">=20"
   }

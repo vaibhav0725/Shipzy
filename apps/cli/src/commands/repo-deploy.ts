@@ -37,7 +37,7 @@ export async function repoDeploy(input: string, opts: DeployOptions & { branch?:
   const keep = parseKeep(opts.keep, DEFAULT_KEEP);
 
   const out = await getOutputs(global.stackName);
-  if (!out.buildProject || !out.buildsBucket) throw new Error('This stack has no build support yet. Run `deployer init` to add it.');
+  if (!out.buildProject || !out.buildsBucket) throw new Error('This stack has no build support yet. Run `shipzy init` to add it.');
 
   // Public first: no token is needed, and none is sent. Only when GitHub says it cannot see the repository do we
   // try the stored token, which may belong to a private repository.
@@ -54,7 +54,7 @@ export async function repoDeploy(input: string, opts: DeployOptions & { branch?:
     } catch {
       throw new Error(
         `"${parsed.repo}" is private, or does not exist. For a private repository, store a token first:\n` +
-          `  deployer github connect -p ${project} --repo ${parsed.repo}`,
+          `  shipzy github connect -p ${project} --repo ${parsed.repo}`,
       );
     }
   }
@@ -84,6 +84,6 @@ export async function repoDeploy(input: string, opts: DeployOptions & { branch?:
   });
   await watchBuild(buildId, hosts, project, Boolean(opts.detach));
   if (!manifest.source) {
-    console.log(`\nThis was a one-time deploy. To redeploy on every push: deployer github connect -p ${project} --repo ${repo.full_name}`);
+    console.log(`\nThis was a one-time deploy. To redeploy on every push: shipzy github connect -p ${project} --repo ${repo.full_name}`);
   }
 }

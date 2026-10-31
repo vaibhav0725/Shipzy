@@ -31,7 +31,7 @@ export async function rollback(opts: RollbackOptions, global: GlobalOptions): Pr
     target = manifest.deployments[idx - 1]!.id;
   }
   if (!manifest.deployments.some((d) => d.id === target)) {
-    throw new Error(`Deployment ${target} not found. See \`deployer list --project ${opts.project}\`.`);
+    throw new Error(`Deployment ${target} not found. See \`shipzy list --project ${opts.project}\`.`);
   }
 
   for (const host of hosts) await setRoute(out.kvsArn, host, routeTarget(opts.project, target));

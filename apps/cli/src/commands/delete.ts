@@ -43,7 +43,7 @@ export async function deleteProject(opts: DeleteOptions, global: GlobalOptions):
 
   // A project connected to GitHub but never deployed has only a history file.
   if (!known.includes(project) && manifest.deployments.length === 0 && folders.length === 0 && routes.length === 0) {
-    throw new Error(`Project "${project}" not found. See \`deployer list\`.`);
+    throw new Error(`Project "${project}" not found. See \`shipzy list\`.`);
   }
 
   console.log(`Project ${ui.name(`"${project}"`)}: ${folders.length} deployment folder${folders.length === 1 ? '' : 's'} in S3.`);

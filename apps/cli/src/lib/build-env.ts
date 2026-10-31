@@ -20,7 +20,7 @@ export async function projectBuildEnv(
   if (names.length > 0) {
     throw new Error(
       `${names.join(', ')} ${names.length === 1 ? 'is' : 'are'} listed for "${project}" but missing from the parameter store. ` +
-        `Set again with: deployer env set -p ${project} <NAME> <value>   (or remove: deployer env rm -p ${project} <NAME>)`,
+        `Set again with: shipzy env set -p ${project} <NAME> <value>   (or remove: shipzy env rm -p ${project} <NAME>)`,
     );
   }
   return vars;

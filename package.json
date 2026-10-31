@@ -1,7 +1,7 @@
 {
-  "name": "deployer",
+  "name": "shipzy",
   "private": true,
-  "description": "Open-source, bring-your-own-AWS static site deployer (Vercel-style)",
+  "description": "Open-source, bring-your-own-AWS static site hosting (Vercel-style)",
   "license": "Apache-2.0",
   "workspaces": [
     "packages/*",
@@ -12,6 +12,6 @@
   },
   "scripts": {
     "build": "npm run build -w packages/core && npm run build -w packages/engine && npm run build -w packages/stack && npm run build -w apps/dashboard && npm run build -w apps/cli",
-    "deployer": "node apps/cli/dist/deployer.mjs"
+    "shipzy": "node apps/cli/dist/shipzy.mjs"
   }
 }

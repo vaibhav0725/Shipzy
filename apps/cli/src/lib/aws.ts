@@ -15,7 +15,7 @@ export interface StackOutputs {
   distributionId: string;
   domain: string;
   kvsArn: string;
-  /** Remote builds; absent on a stack created before they existed (run `deployer init` to add them). */
+  /** Remote builds; absent on a stack created before they existed (run `shipzy init` to add them). */
   buildsBucket?: string;
   buildProject?: string;
   engineFunction?: string;
@@ -66,7 +66,7 @@ export function readOutputs(stack: { Outputs?: { OutputKey?: string; OutputValue
   const find = (key: string) => stack.Outputs?.find((o) => o.OutputKey === key)?.OutputValue;
   const get = (key: string): string => {
     const value = find(key);
-    if (!value) throw new Error(`Stack is missing output ${key}; try \`deployer init\` again.`);
+    if (!value) throw new Error(`Stack is missing output ${key}; try \`shipzy init\` again.`);
     return value;
   };
   return {
@@ -94,7 +94,7 @@ export function engineKeyOf(stack: { Parameters?: { ParameterKey?: string; Param
 /** `alsoAllow`: states a recovery command may run in (e.g. DELETE_FAILED, to finish removing what blocked a delete). */
 export async function getOutputs(stackName: string, alsoAllow: string[] = []): Promise<StackOutputs> {
   const stack = await findStack(stackName);
-  if (!stack) throw new Error(`Stack "${stackName}" not found. Run \`deployer init\` first.`);
+  if (!stack) throw new Error(`Stack "${stackName}" not found. Run \`shipzy init\` first.`);
   if (!OK_STATUSES.has(stack.StackStatus ?? '') && !alsoAllow.includes(stack.StackStatus ?? '')) {
     throw new Error(`Stack "${stackName}" is in state ${stack.StackStatus}; wait for it or fix it first.`);
   }

@@ -4,7 +4,7 @@ import Nav from '@/components/Nav';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'deployer',
+  title: 'shipzy',
   description: 'Local dashboard for your own AWS deployments',
 };
 

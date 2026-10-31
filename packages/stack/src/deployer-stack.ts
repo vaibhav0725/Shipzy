@@ -10,9 +10,9 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 
-// Stands in for the engine code until `deployer init` has uploaded the real zip (see EngineKey).
+// Stands in for the engine code until `shipzy init` has uploaded the real zip (see EngineKey).
 const ENGINE_PLACEHOLDER =
-  "exports.promote = exports.webhook = async () => { throw new Error('Engine code is not installed yet. Run: deployer init'); };";
+  "exports.promote = exports.webhook = async () => { throw new Error('Engine code is not installed yet. Run: shipzy init'); };";
 
 export class DeployerStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -55,10 +55,10 @@ export class DeployerStack extends cdk.Stack {
     });
 
     const distribution = new cloudfront.Distribution(this, 'Cdn', {
-      comment: 'deployer static sites',
+      comment: 'shipzy static sites',
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
       // A missing file is a 403 from the private bucket. CloudFront shows /404.html from the bucket root with a real 404
-      // status (`deployer init` puts a small page there; it shows the site's own 404.html when there is one).
+      // status (`shipzy init` puts a small page there; it shows the site's own 404.html when there is one).
       errorResponses: [403, 404].map((httpStatus) => ({
         httpStatus,
         responseHttpStatus: 404,
@@ -85,7 +85,7 @@ export class DeployerStack extends cdk.Stack {
       ],
     });
 
-    // Custom-domain distributions (see `deployer domain`) are separate stacks that read this bucket through the
+    // Custom-domain distributions (see `shipzy domain`) are separate stacks that read this bucket through the
     // same Origin Access Control. The statement the origin adds names only the main distribution, so allow
     // this account's distributions as well.
     bucket.addToResourcePolicy(
@@ -100,12 +100,12 @@ export class DeployerStack extends cdk.Stack {
 
     // ---- Builds: remote builds, GitHub webhook, and the engine that promotes a finished build ----
 
-    // The Lambda code is a zip in the Builds bucket, uploaded by `deployer init` after the bucket
+    // The Lambda code is a zip in the Builds bucket, uploaded by `shipzy init` after the bucket
     // exists, so the stack needs no `cdk bootstrap` and no asset publishing.
     const engineKey = new cdk.CfnParameter(this, 'EngineKey', {
       type: 'String',
       default: '',
-      description: 'S3 key (in the Builds bucket) of the engine zip; set by `deployer init`',
+      description: 'S3 key (in the Builds bucket) of the engine zip; set by `shipzy init`',
     });
     const hasEngine = new cdk.CfnCondition(this, 'HasEngine', {
       expression: cdk.Fn.conditionNot(cdk.Fn.conditionEquals(engineKey.valueAsString, '')),
@@ -132,7 +132,7 @@ export class DeployerStack extends cdk.Stack {
       generateSecretString: { passwordLength: 40, excludePunctuation: true },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
-    // Created with a throwaway value; `deployer github connect` replaces it with the user's token.
+    // Created with a throwaway value; `shipzy github connect` replaces it with the user's token.
     const githubToken = new secretsmanager.Secret(this, 'GithubToken', {
       description: 'GitHub token used to clone private repositories',
       generateSecretString: { passwordLength: 16, excludePunctuation: true },
@@ -196,7 +196,7 @@ export class DeployerStack extends cdk.Stack {
       env: { shell: 'bash' },
       phases: {
         install: { 'runtime-versions': { nodejs: 22 } },
-        // The script lives in the Builds bucket (uploaded by `deployer init`) so CodeBuild never echoes
+        // The script lives in the Builds bucket (uploaded by `shipzy init`) so CodeBuild never echoes
         // it into build logs or failure messages.
         build: {
           commands: ['aws s3 cp "s3://$BUILDS_BUCKET/scripts/build.sh" /tmp/build.sh --only-show-errors', 'bash /tmp/build.sh'],
@@ -230,7 +230,7 @@ export class DeployerStack extends cdk.Stack {
     bucket.grantReadWrite(project);
     builds.grantRead(project, 'src/*');
     builds.grantRead(project, 'scripts/*');
-    // Project environment variables are injected by CodeBuild from SSM Parameter Store (see `deployer env`).
+    // Project environment variables are injected by CodeBuild from SSM Parameter Store (see `shipzy env`).
     project.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['ssm:GetParameters'],
@@ -260,7 +260,7 @@ export class DeployerStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'DistributionId', { value: distribution.distributionId });
     new cdk.CfnOutput(this, 'DistributionDomain', { value: distribution.distributionDomainName });
     new cdk.CfnOutput(this, 'KeyValueStoreArn', { value: routes.keyValueStoreArn });
-    // What `deployer domain add` hands to a domain stack.
+    // What `shipzy domain add` hands to a domain stack.
     new cdk.CfnOutput(this, 'OriginDomainName', { value: bucket.bucketRegionalDomainName });
     new cdk.CfnOutput(this, 'OacId', { value: oac!.attrId });
     new cdk.CfnOutput(this, 'RouterFunctionArn', { value: router.functionArn });

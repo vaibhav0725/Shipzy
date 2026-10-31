@@ -32,9 +32,9 @@ net.setDefaultAutoSelectFamily(false);
 declare const __DEPLOYER_VERSION__: string | undefined;
 
 const program = new Command()
-  .name('deployer')
+  .name('shipzy')
   .version(typeof __DEPLOYER_VERSION__ === 'undefined' ? 'dev' : __DEPLOYER_VERSION__)
-  .description('Deploy static React apps to your own AWS account (S3 + CloudFront)')
+  .description('Deploy static React and Next.js sites to your own AWS account (S3 + CloudFront)')
   .option('--profile <name>', 'AWS profile to use')
   .option('--region <region>', 'AWS region (default: AWS_REGION or us-east-1)')
   .option('--stack-name <name>', 'CloudFormation stack name', 'Deployer');
@@ -104,7 +104,7 @@ program
 
 program
   .command('logs <build>')
-  .description('Show the log of a remote build (id as shown by `deployer builds`)')
+  .description('Show the log of a remote build (id as shown by `shipzy builds`)')
   .option('-f, --follow', 'keep streaming until the build finishes')
   .action((build, opts) => logs(build, opts, globals()));
 

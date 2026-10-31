@@ -35,7 +35,7 @@ export async function previewsList(opts: { project?: string; json?: boolean }, g
 
   if (opts.json) return console.log(JSON.stringify({ bases, previews }, null, 2));
   if (bases.length === 0) {
-    console.log('No preview domain is set up. Add one with: deployer domain add "*.preview.<your domain>" --preview');
+    console.log('No preview domain is set up. Add one with: shipzy domain add "*.preview.<your domain>" --preview');
   } else {
     console.log(`Preview domain${bases.length === 1 ? '' : 's'}: ${bases.map((b) => `*.${b}`).join(', ')}`);
   }

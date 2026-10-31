@@ -51,7 +51,7 @@ export interface Manifest {
   source?: GithubSource;
   /** names of the project's build-time environment variables (values are in SSM) */
   env?: ManifestEnv;
-  /** custom domains this project is served on (each has its own distribution; see `deployer domain`) */
+  /** custom domains this project is served on (each has its own distribution; see `shipzy domain`) */
   domains?: string[];
   /** the project's own CloudFront address ("dxxxx.cloudfront.net"), created the first time it is deployed without a domain */
   siteHost?: string;

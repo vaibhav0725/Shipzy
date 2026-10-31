@@ -10,7 +10,7 @@ const CACHING_OPTIMIZED = '658327ea-f89d-4fab-a63d-7e88639e58f6';
  * bucket. It reuses the main stack's router function (and through it the routing table) and Origin Access
  * Control, so the same `host -> deployment` entries that drive the default URL drive this one.
  *
- * The values it needs from the main stack are parameters, filled in by `deployer domain add`.
+ * The values it needs from the main stack are parameters, filled in by `shipzy domain add`.
  */
 export class DomainStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -40,7 +40,7 @@ export class DomainStack extends cdk.Stack {
     const distribution = new cloudfront.CfnDistribution(this, 'Cdn', {
       distributionConfig: {
         enabled: true,
-        comment: cdk.Fn.sub('deployer domain ${DomainName}'),
+        comment: cdk.Fn.sub('shipzy domain ${DomainName}'),
         aliases: [domainName.valueAsString],
         priceClass: 'PriceClass_100',
         httpVersion: 'http2',

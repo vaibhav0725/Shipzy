@@ -35,7 +35,7 @@ export default function Overview() {
           <strong>Could not read the stack.</strong> {error}
           {/not found/i.test(error) && (
             <p style={{ margin: '8px 0 0' }}>
-              Create it from a terminal with <code>deployer init</code>, then refresh this page.
+              Create it from a terminal with <code>shipzy init</code>, then refresh this page.
             </p>
           )}
         </div>
@@ -94,7 +94,7 @@ export default function Overview() {
               <dt>Account</dt><dd className="mono">{data.account}</dd>
               <dt>Region</dt><dd>{data.region ?? '-'}</dd>
               <dt>Stack</dt><dd>{data.stack.name}</dd>
-              <dt>Remote builds</dt><dd>{data.builds.engine ? 'ready' : <>not set up: run <code>deployer init</code></>}</dd>
+              <dt>Remote builds</dt><dd>{data.builds.engine ? 'ready' : <>not set up: run <code>shipzy init</code></>}</dd>
               <dt>Default URL</dt>
               <dd>
                 <a href={data.distribution.url} target="_blank" rel="noreferrer">{data.distribution.url.replace('https://', '')}</a>

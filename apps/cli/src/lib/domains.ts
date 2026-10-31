@@ -29,7 +29,7 @@ const LABEL = /^(?!-)[a-z0-9-]{1,63}(?<!-)$/;
 export function validateHost(raw: string, allowWildcard = false): string {
   const host = raw.trim().toLowerCase().replace(/\.$/, '');
   const wildcard = host.startsWith('*.');
-  if (wildcard && !allowWildcard) throw new Error(`"${raw}": wildcard domains are only for previews (use: deployer domain add "${raw}" --preview).`);
+  if (wildcard && !allowWildcard) throw new Error(`"${raw}": wildcard domains are only for previews (use: shipzy domain add "${raw}" --preview).`);
   const labels = (wildcard ? host.slice(2) : host).split('.');
   if (
     labels.length < 2 ||

@@ -56,7 +56,7 @@ export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   try {
     data = text ? JSON.parse(text) : undefined;
   } catch {
-    throw new ApiError(res.status === 401 ? 'Not signed in. Open the address that `deployer dashboard` printed.' : text.slice(0, 200) || `Request failed (${res.status})`);
+    throw new ApiError(res.status === 401 ? 'Not signed in. Open the address that `shipzy dashboard` printed.' : text.slice(0, 200) || `Request failed (${res.status})`);
   }
   if (!res.ok) throw new ApiError((data as { error?: string })?.error ?? `Request failed (${res.status})`);
   return data as T;

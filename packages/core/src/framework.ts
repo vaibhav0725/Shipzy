@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 // What kind of project is this, where does its build output land, and how must the edge serve it?
-// One implementation for both places that need the answer: `deployer deploy` on a machine, and the build script that
+// One implementation for both places that need the answer: `shipzy deploy` on a machine, and the build script that
 // runs in CodeBuild (which gets a bundled copy of this file; see packages/engine/scripts/build.mjs).
 
 export type Framework = 'vite' | 'create-react-app' | 'react' | 'next-static';

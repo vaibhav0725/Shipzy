@@ -75,11 +75,11 @@ export async function domainAdd(hostArg: string, opts: DomainAddOptions, global:
   }
   const out = await getOutputs(global.stackName);
   if (!out.originDomain || !out.oacId || !out.routerFunctionArn) {
-    throw new Error('This stack predates custom domains. Run `deployer init` to update it.');
+    throw new Error('This stack predates custom domains. Run `shipzy init` to update it.');
   }
   if (!opts.preview) {
     const owner = await projectOfDomain(out.bucket, host);
-    if (owner && owner !== opts.project) throw new Error(`${host} already belongs to project "${owner}". Remove it there first: deployer domain rm ${host}`);
+    if (owner && owner !== opts.project) throw new Error(`${host} already belongs to project "${owner}". Remove it there first: shipzy domain rm ${host}`);
     // Every name under a preview domain is made by the preview system.
     if (isPreviewHost(host, await readPreviewBases(out.bucket))) throw new Error(`${host} is under a preview domain, which is reserved for pull request previews.`);
   }
@@ -145,8 +145,8 @@ export async function domainAdd(hostArg: string, opts: DomainAddOptions, global:
   // 4. Claim it for the project and serve what is live now
   if (opts.preview) {
     await updatePreviewBases(out.bucket, (bases) => [...bases, host.slice(2)]);
-    console.log(`${host} is ready for pull request previews. Turn them on for a project with: deployer github connect -p <project> --repo <owner/name> --previews --reuse-token`);
-    if (opts.wait === false) return console.log(`Check later with: deployer domain verify ${host}`);
+    console.log(`${host} is ready for pull request previews. Turn them on for a project with: shipzy github connect -p <project> --repo <owner/name> --previews --reuse-token`);
+    if (opts.wait === false) return console.log(`Check later with: shipzy domain verify ${host}`);
     return waitForDns(host, distribution);
   }
   const project = opts.project!;
@@ -160,7 +160,7 @@ export async function domainAdd(hostArg: string, opts: DomainAddOptions, global:
   console.log(id ? ui.ok(`${ui.name(host)} now serves ${ui.name(project!)} (${ui.dim(id)}).`) : ui.ok(`${ui.name(host)} is ready; deploy ${project} to put something on it.`));
 
   // 5. Wait for DNS to catch up
-  if (opts.wait === false) return console.log(`Check later with: deployer domain verify ${host}`);
+  if (opts.wait === false) return console.log(`Check later with: shipzy domain verify ${host}`);
   return waitForDns(host, distribution, true);
 }
 
@@ -170,7 +170,7 @@ async function waitForDns(host: string, distribution: string, serving = false): 
     if ((await checkDns(host, distribution)) === 'ok') return console.log(serving ? `\n${ui.ok(ui.bold(ui.green('Live:')))} ${ui.url(`https://${host}`)}` : `\n${ui.ok(`DNS for ${host} is in place.`)}`);
     await sleep(15_000);
   }
-  console.log(`DNS has not reached the distribution yet (it can take a while). Check with: deployer domain verify ${host}`);
+  console.log(`DNS has not reached the distribution yet (it can take a while). Check with: shipzy domain verify ${host}`);
 }
 
 export async function domainList(opts: { project?: string; json?: boolean }, global: GlobalOptions): Promise<void> {
@@ -197,7 +197,7 @@ export async function domainList(opts: { project?: string; json?: boolean }, glo
   );
   const rows = all.filter((r): r is NonNullable<typeof r> => r !== undefined);
   if (opts.json) return console.log(JSON.stringify(rows, null, 2));
-  if (rows.length === 0) return console.log('No custom domains. Add one with: deployer domain add <host> -p <project>');
+  if (rows.length === 0) return console.log('No custom domains. Add one with: shipzy domain add <host> -p <project>');
   console.log(table(['HOST', 'PROJECT', 'STACK', 'CERTIFICATE', 'DNS'], rows.map((r) => [ui.url(r.host), ui.name(r.project), colorStatus(r.stack), colorStatus(r.certificate), colorStatus(r.dns)])));
 }
 
@@ -211,7 +211,7 @@ export async function domainVerify(hostArg: string, global: GlobalOptions): Prom
   const dns = stack?.distributionDomain ? await checkDns(host, stack.distributionDomain) : 'pending';
 
   const mark = (ok: boolean) => (ok ? ui.green('ok     ') : ui.red('MISSING'));
-  console.log(`${mark(Boolean(stack))} distribution stack ${stack ? `(${stack.status})` : '- run: deployer domain add ' + host + ' -p <project>'}`);
+  console.log(`${mark(Boolean(stack))} distribution stack ${stack ? `(${stack.status})` : '- run: shipzy domain add ' + host + ' -p <project>'}`);
   console.log(`${mark(cert?.status === 'ISSUED')} certificate ${cert ? `(${cert.status})` : ''}`);
   console.log(`${mark(Boolean(project))} ${isBase ? 'registered as a preview domain' : 'claimed by a project'} ${project && !isBase ? `(${project})` : ''}`);
   console.log(`${mark(dns === 'ok')} DNS ${dns === 'ok' ? 'reaches the distribution' : dns === 'wrong' ? 'resolves, but not to this distribution' : 'is not visible yet'}`);

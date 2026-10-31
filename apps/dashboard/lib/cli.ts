@@ -71,7 +71,7 @@ function run(args: string[]): Promise<string> {
     let err = '';
     child.stdout.on('data', (d: Buffer) => (out += d));
     child.stderr.on('data', (d: Buffer) => (err += d));
-    child.on('error', (e) => reject(new CliError(`Could not start the deployer CLI: ${e.message}`)));
+    child.on('error', (e) => reject(new CliError(`Could not start the shipzy CLI: ${e.message}`)));
     child.on('close', (code) => {
       if (code === 0) return resolve(out);
       const message = (err.trim() || out.trim()).replace(/^Error:\s*/, '').split('\n').filter(Boolean).slice(-3).join(' ');

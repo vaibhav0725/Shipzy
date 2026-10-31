@@ -15,7 +15,7 @@ export async function list(opts: ListOptions, global: GlobalOptions): Promise<vo
   if (!opts.project) {
     const projects = await listProjects(out);
     if (opts.json) return console.log(JSON.stringify(projects, null, 2));
-    if (projects.length === 0) return console.log('No projects yet. Run `deployer deploy <dir>`.');
+    if (projects.length === 0) return console.log('No projects yet. Run `shipzy deploy <dir>`.');
 
     const rows = projects.map((p) => [
       ui.name(p.name),
@@ -32,7 +32,7 @@ export async function list(opts: ListOptions, global: GlobalOptions): Promise<vo
       ].filter(Boolean).join(', ') || '-',
     ]);
     console.log(table(['PROJECT', 'LIVE ON', 'LIVE DEPLOYMENT', 'DEPLOYED', 'AUTO-DEPLOY FROM', 'VERSIONS', 'SIZE', 'NOTES'], rows));
-    console.log(ui.dim('\nDetails: deployer list -p <project>'));
+    console.log(ui.dim('\nDetails: shipzy list -p <project>'));
     return;
   }
 

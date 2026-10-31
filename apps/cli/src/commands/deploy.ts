@@ -67,7 +67,7 @@ export async function deploy(dirArg: string, opts: DeployOptions, global: Global
     const outcome = await discardUpload(out, hosts, target);
     if (outcome === 'removed') console.error(uiErr.red('Deploy failed; removed the partial upload.'));
     if (outcome === 'failed') {
-      console.error(uiErr.red('Deploy failed and the partial upload could not be removed; `deployer prune` will clean it up.'));
+      console.error(uiErr.red('Deploy failed and the partial upload could not be removed; `shipzy prune` will clean it up.'));
     }
     throw err;
   }
@@ -86,6 +86,6 @@ export async function deploy(dirArg: string, opts: DeployOptions, global: Global
     const count = pruned.expired.length + pruned.orphans.length;
     if (count > 0) console.log(ui.dim(`Cleaned up ${count} old deployment${count === 1 ? '' : 's'} (keeping the newest ${keep}).`));
   } catch (err) {
-    console.warn(`${uiErr.yellow('Warning:')} cleanup skipped (${err instanceof Error ? err.message : err}). Run \`deployer prune\` later.`);
+    console.warn(`${uiErr.yellow('Warning:')} cleanup skipped (${err instanceof Error ? err.message : err}). Run \`shipzy prune\` later.`);
   }
 }

@@ -38,7 +38,7 @@ export const envOf = (build: Build, name: string): string | undefined =>
 
 export const shortId = (build: Build): string => (build.id ?? '').split(':').pop()!.slice(0, 8);
 
-/** Accepts a full build id, a full uuid, or a unique prefix of one (as shown by `deployer builds`). */
+/** Accepts a full build id, a full uuid, or a unique prefix of one (as shown by `shipzy builds`). */
 export async function resolveBuildId(project: string, input: string): Promise<string> {
   if (input.includes(':')) return input;
   const matches = (await recentBuilds(project, 50)).filter((b) => b.id?.split(':').pop()?.startsWith(input));

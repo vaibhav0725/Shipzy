@@ -120,7 +120,7 @@ export function explainGithubError(err: unknown, repo: string): Error {
     if (err.status === 401) return new Error('GitHub rejected the token (expired, revoked or mistyped).');
     if (err.status === 404) return new Error(`Repository "${repo}" was not found, or the token cannot see it.`);
     if (err.status === 403 && /rate limit/i.test(err.message)) {
-      return new Error('GitHub is limiting requests without a token (60 an hour). Wait a while, or connect a token: deployer github connect.');
+      return new Error('GitHub is limiting requests without a token (60 an hour). Wait a while, or connect a token: shipzy github connect.');
     }
     return new Error(`GitHub said ${err.status}: ${err.message}`);
   }

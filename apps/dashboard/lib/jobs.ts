@@ -87,12 +87,12 @@ const info = (j: Job): JobInfo => ({
 
 function runStep(job: Job, step: Step): Promise<number | null> {
   const { file, argv } = cliCommand(step.args);
-  append(job, `$ deployer ${step.args.join(' ')}`);
+  append(job, `$ shipzy ${step.args.join(' ')}`);
   return new Promise((resolve) => {
     const child = spawn(file, argv, {
       stdio: [step.stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
       env: childEnv(step.env),
-      // Where `deployer dashboard` was started, so relative paths in the output read as they would in a terminal.
+      // Where `shipzy dashboard` was started, so relative paths in the output read as they would in a terminal.
       cwd: settings().cwd,
     });
     job.child = child;
@@ -112,7 +112,7 @@ function runStep(job: Job, step: Step): Promise<number | null> {
     child.stdout!.on('data', feed('out'));
     child.stderr!.on('data', feed('err'));
     child.on('error', (e) => {
-      append(job, `Could not start the deployer CLI: ${e.message}`);
+      append(job, `Could not start the shipzy CLI: ${e.message}`);
       resolve(null);
     });
     child.on('close', (code) => {

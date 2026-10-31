@@ -171,5 +171,5 @@ async function printSummary(stackName: string): Promise<void> {
   console.log(`  ${ui.dim('Default URL: ')} ${ui.url(`https://${out.domain}`)}`);
   console.log(`  ${ui.dim('Builds:      ')} ${out.buildProject}`);
   console.log(`  ${ui.dim('Webhook URL: ')} ${out.webhookUrl}`);
-  console.log(`\n${ui.bold('Next:')} ${ui.accent('deployer deploy <react-app-dir> --project <name>')}`);
+  console.log(`\n${ui.bold('Next:')} ${ui.accent('shipzy deploy <react-app-dir> --project <name>')}`);
 }

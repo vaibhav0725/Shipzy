@@ -1,8 +1,8 @@
-# deployer (working name)
+# shipzy
 
 > **Full documentation:** [docs/GUIDE.md](docs/GUIDE.md) covers how it works, every feature, how to use it, and troubleshooting.
 
-Open-source, bring-your-own-AWS deployer for static React apps. Everything runs in **your** AWS
+Open-source, bring-your-own-AWS hosting for static React and Next.js sites. Everything runs in **your** AWS
 account: an S3 bucket, a CloudFront distribution, and a CloudFront KeyValueStore that maps hosts to
 immutable deployments, so promote and rollback are a single routing update (visible at the edge in about 30 seconds, with no re-upload or distribution update).
 
@@ -14,36 +14,36 @@ environment variables, custom domains (HTTPS, Route 53 automation) and a local w
 ```sh
 npm install
 npm run build          # builds the shared code, the Lambda zip, the stack template and the single-file CLI
-cd apps/cli && npm link && cd ../..   # puts a real `deployer` command on your PATH
+cd apps/cli && npm link && cd ../..   # puts a real `shipzy` command on your PATH
 export AWS_PROFILE=deployer-dev       # use an IAM user or SSO profile, not root
-deployer --version
+shipzy --version
 ```
 
-`npm unlink -g @deployer/cli` removes it again. Inside the repo you can also run `npm run deployer -- <command>`.
+`npm unlink -g shipzy` removes it again. Inside the repo you can also run `npm run shipzy -- <command>`.
 
 ## Usage
 ```sh
-deployer init                                   # create the stack (~5 min)
-deployer deploy ./my-react-app --project demo   # build, upload, promote
-deployer deploy ./my-react-app --remote         # build in CodeBuild in your AWS account instead
-deployer builds                                 # recent remote builds
-deployer logs <build> -f                        # a build's log (id from `builds`)
-deployer env set -p demo VITE_API_URL https://api.example.com   # build-time variable for remote/GitHub builds
-deployer env ls -p demo                                    # names only; values are never shown
-deployer github connect -p demo --repo owner/name   # deploy on every push (asks for a GitHub token)
-deployer github deploy -p demo                  # build the connected branch's current head now
-deployer github disconnect -p demo
-deployer domain add app.example.com -p demo     # your own hostname with HTTPS (certificate, distribution, DNS)
-deployer domain ls                              # domains and their state
-deployer domain rm app.example.com              # remove it completely
-deployer dashboard                              # local web UI: deploy from a folder or GitHub, manage everything
-deployer status                                 # account, stack, URL, totals
-deployer list                                   # all projects: live host, version, size
-deployer list --project demo                    # one project's deployments
-deployer rollback --project demo                # back to the previous deployment
-deployer prune --project demo --dry-run           # preview cleanup
-deployer delete --project demo                  # remove one project: sites, sources, webhook (asks to confirm)
-deployer destroy                                # remove the whole stack: sites, webhooks, both buckets
+shipzy init                                   # create the stack (~5 min)
+shipzy deploy ./my-react-app --project demo   # build, upload, promote
+shipzy deploy ./my-react-app --remote         # build in CodeBuild in your AWS account instead
+shipzy builds                                 # recent remote builds
+shipzy logs <build> -f                        # a build's log (id from `builds`)
+shipzy env set -p demo VITE_API_URL https://api.example.com   # build-time variable for remote/GitHub builds
+shipzy env ls -p demo                                    # names only; values are never shown
+shipzy github connect -p demo --repo owner/name   # deploy on every push (asks for a GitHub token)
+shipzy github deploy -p demo                  # build the connected branch's current head now
+shipzy github disconnect -p demo
+shipzy domain add app.example.com -p demo     # your own hostname with HTTPS (certificate, distribution, DNS)
+shipzy domain ls                              # domains and their state
+shipzy domain rm app.example.com              # remove it completely
+shipzy dashboard                              # local web UI: deploy from a folder or GitHub, manage everything
+shipzy status                                 # account, stack, URL, totals
+shipzy list                                   # all projects: live host, version, size
+shipzy list --project demo                    # one project's deployments
+shipzy rollback --project demo                # back to the previous deployment
+shipzy prune --project demo --dry-run           # preview cleanup
+shipzy delete --project demo                  # remove one project: sites, sources, webhook (asks to confirm)
+shipzy destroy                                # remove the whole stack: sites, webhooks, both buckets
 ```
 
 `list` and `status` accept `--json` for scripting.
@@ -77,14 +77,14 @@ Every deploy is a full, immutable copy, so the CLI keeps storage bounded:
 - A deploy that fails removes its own partial upload (unless the route already points at it).
 - After each successful deploy, only the newest `--keep` deployments (default 10) are retained, plus
   any that a host is routed to. Older ones are deleted, which limits how far back you can roll back.
-- `deployer prune` also removes uploads that were never promoted, such as from an interrupted deploy.
+- `shipzy prune` also removes uploads that were never promoted, such as from an interrupted deploy.
   Unrecorded uploads younger than `--grace-minutes` (default 60) are left alone in case a deploy is running.
 
 ## How it works
 - `packages/core`: code shared by the CLI and the Lambdas (routing table, deployment history, pruning).
 - `packages/stack`: CDK app. `npm run build` synthesizes it to `apps/cli/assets/template.json`.
   It has no file assets, so no `cdk bootstrap` is needed; the CLI deploys the template directly with CloudFormation.
-- `packages/engine`: two Lambda functions, bundled to `apps/cli/assets/engine.zip`. `deployer init` uploads the
+- `packages/engine`: two Lambda functions, bundled to `apps/cli/assets/engine.zip`. `shipzy init` uploads the
   zip to the Builds bucket and points the stack at it. `promote` publishes a finished build; `webhook` receives
   GitHub push events (the public URL is protected by an HMAC signature, not by being secret).
 - `apps/cli`: builds the React app locally, uploads it to `s3://<bucket>/<project>/<deployment-id>/`,

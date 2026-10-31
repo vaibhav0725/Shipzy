@@ -22,7 +22,7 @@ export async function remoteDeploy(dirArg: string, opts: DeployOptions, global: 
 
   const out = await getOutputs(global.stackName);
   if (!out.buildProject || !out.buildsBucket) {
-    throw new Error('This stack has no build support yet. Run `deployer init` to add it.');
+    throw new Error('This stack has no build support yet. Run `shipzy init` to add it.');
   }
   const explicit = opts.host ? [opts.host.toLowerCase()] : undefined;
   await ensureProjectSite(out, global, project, explicit);
@@ -32,8 +32,8 @@ export async function remoteDeploy(dirArg: string, opts: DeployOptions, global: 
   const { zip, files, skippedEnvFiles } = zipSource(dir);
   if (skippedEnvFiles.length > 0) {
     console.log(
-      `Not uploading ${skippedEnvFiles.join(', ')}. Remote builds use the variables stored with \`deployer env\` ` +
-        `(${env.length} set for this project); import a file with: deployer env import -p ${project} <file>`,
+      `Not uploading ${skippedEnvFiles.join(', ')}. Remote builds use the variables stored with \`shipzy env\` ` +
+        `(${env.length} set for this project); import a file with: shipzy env import -p ${project} <file>`,
     );
   }
 

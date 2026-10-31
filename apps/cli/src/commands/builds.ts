@@ -11,7 +11,7 @@ export interface BuildsOptions {
 
 export async function builds(opts: BuildsOptions, global: GlobalOptions): Promise<void> {
   const out = await getOutputs(global.stackName);
-  if (!out.buildProject) throw new Error('This stack has no build support yet. Run `deployer init` to add it.');
+  if (!out.buildProject) throw new Error('This stack has no build support yet. Run `shipzy init` to add it.');
 
   const limit = Number(opts.limit);
   if (!Number.isInteger(limit) || limit < 1) throw new Error('--limit must be a whole number >= 1.');
@@ -34,12 +34,12 @@ export async function builds(opts: BuildsOptions, global: GlobalOptions): Promis
   });
 
   if (opts.json) return console.log(JSON.stringify(rows, null, 2));
-  if (rows.length === 0) return console.log('No builds yet. Try `deployer deploy <dir> --remote`.');
+  if (rows.length === 0) return console.log('No builds yet. Try `shipzy deploy <dir> --remote`.');
   console.log(
     table(
       ['BUILD', 'PROJECT', 'STATUS', 'SOURCE', 'DEPLOYMENT', 'STARTED', 'TOOK'],
       rows.map((r) => [r.build, ui.name(r.project), colorStatus(r.status), r.source, r.deployment, timeAgo(r.startedAt), r.duration]),
     ),
   );
-  console.log(ui.dim('\nLogs: deployer logs <build>'));
+  console.log(ui.dim('\nLogs: shipzy logs <build>'));
 }

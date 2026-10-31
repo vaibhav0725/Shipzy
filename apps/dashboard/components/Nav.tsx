@@ -61,7 +61,7 @@ export default function Nav() {
     <aside className="side">
       <Link href="/" className="brand">
         <Logo />
-        deployer
+        shipzy
       </Link>
       <nav className="nav" aria-label="Main">
         {links.map((l) => (

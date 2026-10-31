@@ -18,7 +18,7 @@ import { deleteParams, putParam } from '../lib/ssm.js';
 const scopeOf = (preview?: boolean): EnvScope => (preview ? 'preview' : 'production');
 
 const APPLY_HINT = (project: string) =>
-  `Applies to the next build, not to what is live now. Rebuild with: deployer deploy <dir> --remote  (or: deployer github deploy -p ${project})`;
+  `Applies to the next build, not to what is live now. Rebuild with: shipzy deploy <dir> --remote  (or: shipzy github deploy -p ${project})`;
 
 async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
@@ -100,7 +100,7 @@ export async function envList(opts: { project: string; json?: boolean }, global:
     preview: env.preview.includes(name),
   }));
   if (opts.json) return console.log(JSON.stringify(rows, null, 2));
-  if (rows.length === 0) return console.log(`No environment variables for "${opts.project}". Add one with: deployer env set -p ${opts.project} NAME value`);
+  if (rows.length === 0) return console.log(`No environment variables for "${opts.project}". Add one with: shipzy env set -p ${opts.project} NAME value`);
 
   console.log(
     table(
@@ -117,7 +117,7 @@ export async function envRemove(name: string, opts: EnvSetOptions, global: Globa
   const scope = scopeOf(opts.preview);
   const current = (await readManifest(out.bucket, opts.project)).env?.[scope] ?? [];
   if (!current.includes(name)) {
-    throw new Error(`"${name}" is not set for ${scope} builds of ${opts.project}. See: deployer env ls -p ${opts.project}`);
+    throw new Error(`"${name}" is not set for ${scope} builds of ${opts.project}. See: shipzy env ls -p ${opts.project}`);
   }
   await updateManifest(out.bucket, opts.project, (m) => {
     if (m.env) m.env[scope] = m.env[scope].filter((n) => n !== name);

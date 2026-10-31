@@ -19,6 +19,8 @@ if (!fs.existsSync(path.join(standalone, 'apps/dashboard/server.js'))) {
 fs.rmSync(target, { recursive: true, force: true });
 fs.cpSync(standalone, target, { recursive: true, dereference: true });
 fs.cpSync(path.join(app, '.next/static'), path.join(target, 'apps/dashboard/.next/static'), { recursive: true });
+// The tracer pulls in the CLI bundle because the dashboard knows its path; the dashboard never reads it from here.
+for (const stray of ['apps/cli', 'packages']) fs.rmSync(path.join(target, stray), { recursive: true, force: true });
 
 const mb = (fs.readdirSync(target, { recursive: true, withFileTypes: true }).filter((e) => e.isFile()).reduce((n, e) => n + fs.statSync(path.join(e.parentPath, e.name)).size, 0) / 1048576).toFixed(0);
 console.log(`Staged the dashboard in apps/cli/assets/dashboard (${mb} MB)`);

@@ -10,13 +10,13 @@ export async function watchBuild(buildId: string, hosts: string[], project: stri
   console.log(`${ui.step(`Started build ${ui.name(short)} for ${ui.name(project)}`)}\n`);
 
   if (detach) {
-    console.log(`Follow it:  deployer logs ${short} -f\nAll builds: deployer builds -p ${project}`);
+    console.log(`Follow it:  shipzy logs ${short} -f\nAll builds: shipzy builds -p ${project}`);
     return;
   }
 
   // Ctrl-C stops watching, not the build.
   process.once('SIGINT', () => {
-    console.log(`\nStopped watching. The build keeps running; follow it with: deployer logs ${short} -f`);
+    console.log(`\nStopped watching. The build keeps running; follow it with: shipzy logs ${short} -f`);
     process.exit(130);
   });
   const finished = await streamLogs(buildId, true);

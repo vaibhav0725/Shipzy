@@ -35,7 +35,7 @@ interface GithubStack {
 function githubStack(out: StackOutputs): GithubStack {
   const { buildProject, webhookUrl, webhookSecretArn, githubTokenSecretArn } = out;
   if (!buildProject || !webhookUrl || !webhookSecretArn || !githubTokenSecretArn) {
-    throw new Error('This stack has no GitHub support yet. Run `deployer init` to add it.');
+    throw new Error('This stack has no GitHub support yet. Run `shipzy init` to add it.');
   }
   return { buildProject, webhookUrl, webhookSecretArn, githubTokenSecretArn };
 }
@@ -100,7 +100,7 @@ export async function connect(opts: ConnectOptions, global: GlobalOptions): Prom
         `  Secret:       aws secretsmanager get-secret-value --secret-id ${stack.webhookSecretArn} --query SecretString --output text\n` +
         `  Events:       ${opts.previews ? 'Pushes and Pull requests' : 'Just the push event'}\n` +
         'A token with "Webhooks: read and write" (fine-grained) or admin:repo_hook (classic) lets the CLI do this for you:\n' +
-        '  fix the token\'s permissions, then run `deployer github rotate-secret`.',
+        '  fix the token\'s permissions, then run `shipzy github rotate-secret`.',
     );
   }
 
@@ -126,10 +126,10 @@ export async function connect(opts: ConnectOptions, global: GlobalOptions): Prom
     console.log(`Every pull request into ${branch} now gets its own preview URL, removed when the pull request closes.`);
     console.log('The GitHub token needs "Pull requests: Read and write" for the preview comment (fine-grained token) or the repo scope (classic).');
     if ((await readPreviewBases(out.bucket)).length === 0) {
-      console.warn('\nNo preview domain is set up yet, so no preview can be served. Add one with:\n  deployer domain add "*.preview.<your domain>" --preview');
+      console.warn('\nNo preview domain is set up yet, so no preview can be served. Add one with:\n  shipzy domain add "*.preview.<your domain>" --preview');
     }
   }
-  console.log(`${ui.dim('Deploy the current head now with:')} ${ui.accent(`deployer github deploy -p ${opts.project}`)}`);
+  console.log(`${ui.dim('Deploy the current head now with:')} ${ui.accent(`shipzy github deploy -p ${opts.project}`)}`);
 }
 
 export async function githubDeploy(opts: { project: string; detach?: boolean }, global: GlobalOptions): Promise<void> {
@@ -139,7 +139,7 @@ export async function githubDeploy(opts: { project: string; detach?: boolean }, 
   const manifest = await readManifest(out.bucket, opts.project);
   const { source } = manifest;
   if (source?.type !== 'github') {
-    throw new Error(`"${opts.project}" is not connected to GitHub. Run: deployer github connect -p ${opts.project} --repo owner/name`);
+    throw new Error(`"${opts.project}" is not connected to GitHub. Run: shipzy github connect -p ${opts.project} --repo owner/name`);
   }
 
   const explicit = source.host ? [source.host] : undefined;

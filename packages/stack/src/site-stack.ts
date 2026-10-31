@@ -37,7 +37,7 @@ export class SiteStack extends cdk.Stack {
     const distribution = new cloudfront.CfnDistribution(this, 'Cdn', {
       distributionConfig: {
         enabled: true,
-        comment: cdk.Fn.sub('deployer project ${ProjectName}'),
+        comment: cdk.Fn.sub('shipzy project ${ProjectName}'),
         priceClass: 'PriceClass_100',
         httpVersion: 'http2',
         ipv6Enabled: true,

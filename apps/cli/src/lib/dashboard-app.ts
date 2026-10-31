@@ -5,18 +5,18 @@ import * as path from 'node:path';
 import * as readline from 'node:readline/promises';
 import { assetPath } from './assets.js';
 
-// The dashboard is optional. It is a separate package (about 50 MB installed) that `deployer dashboard` installs
-// into ~/.deployer/dashboard-app the first time it is wanted, so people who only use the CLI never download it.
+// The dashboard is optional. It is a separate package (about 50 MB installed) that `shipzy dashboard` installs
+// into ~/.shipzy/dashboard-app the first time it is wanted, so people who only use the CLI never download it.
 // Inside this repository the build leaves a copy in assets/dashboard, which is used as is.
 
 declare const __DEPLOYER_VERSION__: string | undefined;
 declare const __DASHBOARD_PACKAGE__: string | undefined;
 
 const version = typeof __DEPLOYER_VERSION__ === 'undefined' ? undefined : __DEPLOYER_VERSION__;
-const packageName = typeof __DASHBOARD_PACKAGE__ === 'undefined' ? '@deployer/dashboard' : __DASHBOARD_PACKAGE__;
+const packageName = typeof __DASHBOARD_PACKAGE__ === 'undefined' ? 'shipzy-dashboard' : __DASHBOARD_PACKAGE__;
 
 /** Where the optional package is installed. */
-export const installDir = () => path.join(os.homedir(), '.deployer', 'dashboard-app');
+export const installDir = () => path.join(os.homedir(), '.shipzy', 'dashboard-app');
 const packageDir = () => path.join(installDir(), 'node_modules', ...packageName.split('/'));
 
 const SERVER = 'apps/dashboard/server.js';
@@ -65,7 +65,7 @@ function runNpm(args: string[]): Promise<void> {
   });
 }
 
-/** Downloads the dashboard package for this CLI's version into ~/.deployer/dashboard-app. */
+/** Downloads the dashboard package for this CLI's version into ~/.shipzy/dashboard-app. */
 export async function installDashboard(): Promise<string> {
   const dir = installDir();
   fs.mkdirSync(dir, { recursive: true });
@@ -99,7 +99,7 @@ export async function ensureDashboard(install: boolean): Promise<string> {
 
   if (!install) {
     const stale = fs.existsSync(installedServer()) ? ` (the installed one is ${installedVersion() ?? 'unknown'}, this CLI is ${version})` : '';
-    const how = 'deployer dashboard --install';
+    const how = 'shipzy dashboard --install';
     if (!process.stdin.isTTY || !process.stdout.isTTY) {
       throw new Error(`The local dashboard is an optional download and is not installed${stale}. Install it with: ${how}`);
     }

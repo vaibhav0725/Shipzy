@@ -22,7 +22,7 @@ export async function ensureProjectSite(out: StackOutputs, global: GlobalOptions
   if (manifest.siteHost) return manifest.siteHost;
   if (!(await needsOwnSite(out, project, manifest, out.domain, explicit))) return undefined;
   if (!out.originDomain || !out.oacId || !out.routerFunctionArn) {
-    throw new Error('This stack predates project addresses. Run `deployer init` to update it.');
+    throw new Error('This stack predates project addresses. Run `shipzy init` to update it.');
   }
 
   console.log(ui.step(`Creating an address of its own for ${ui.name(project)} (CloudFront, about 5 minutes; only the first deploy of a project)...`));

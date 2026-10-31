@@ -1,10 +1,10 @@
-# deployer: the complete guide
+# shipzy: the complete guide
 
-An open-source, bring-your-own-AWS deployer for static React apps. You point a command-line tool at **your own AWS
+An open-source, bring-your-own-AWS hosting tool for static React apps and static Next.js sites. You point a command-line tool at **your own AWS
 account**, and it publishes React projects there: files in S3, served worldwide by CloudFront, with instant rollback,
 builds that can run in your account, and automatic deploys when you push to GitHub.
 
-`deployer` is a working name. Nothing here runs on a server we operate: the only software outside your AWS account is
+`shipzy` is the name of this project. Nothing here runs on a server we operate: the only software outside your AWS account is
 the CLI on your machine.
 
 **Contents**
@@ -47,7 +47,7 @@ the CLI on your machine.
  ────────────                          ────────────────────────────────────────────────────────────
 
                                        ┌──────────────┐      ┌───────────────────────────────┐
- deployer CLI ── local deploy ───────▶ │ S3 "sites"   │ ◀──┐ │ CloudFront                    │ ◀── visitors
+ shipzy CLI ── local deploy ───────▶ │ S3 "sites"   │ ◀──┐ │ CloudFront                    │ ◀── visitors
    │                                   │ <project>/   │    │ │  router function              │
    │  --remote: zip source             │  <deploy-id>/│    └─│  (reads the routing table,    │
    ├──────────────▶ S3 "builds" ──┐    └──────────────┘      │   rewrites the path)          │
@@ -153,7 +153,7 @@ of truth for what can be rolled back to.
 - Several projects side by side, each on its own hostname; one project on several hostnames.
 
 **Dashboard**
-- `deployer dashboard` opens a web UI on your own computer: deploy from a folder or a GitHub repository, then roll
+- `shipzy dashboard` opens a web UI on your own computer: deploy from a folder or a GitHub repository, then roll
   back, manage domains and variables, and follow build logs live. It runs the same CLI underneath.
 
 **Operating**
@@ -190,18 +190,18 @@ of truth for what can be rolled back to.
 cd /path/to/this/repo
 npm install
 npm run build          # builds core, the engine zip, the CloudFormation template and the single-file CLI
-cd apps/cli && npm link && cd ../..   # installs a real `deployer` command on your PATH
+cd apps/cli && npm link && cd ../..   # installs a real `shipzy` command on your PATH
 export AWS_PROFILE=<your-profile>
-deployer --version
+shipzy --version
 ```
 
-`npm link` makes `deployer` available from any directory, and rebuilding with `npm run build` updates it. To remove it,
-run `npm unlink -g @deployer/cli`. Inside the repository you can also run it as `npm run deployer -- <command>`.
+`npm link` makes `shipzy` available from any directory, and rebuilding with `npm run build` updates it. To remove it,
+run `npm unlink -g shipzy`. Inside the repository you can also run it as `npm run shipzy -- <command>`.
 
 **Installing without the repository.** `npm pack` in `apps/cli` produces a ~0.9 MB tarball that installs with
 `npm install -g <tarball>` and has no dependencies: the CLI, the stack template, the Lambda code and the build script
 are all inside it. The local dashboard is **not** in it: it is a separate, optional package (~16 MB download, ~50 MB
-installed) that `deployer dashboard` offers to download the first time you ask for it (see section 5.10). Both have been
+installed) that `shipzy dashboard` offers to download the first time you ask for it (see section 5.10). Both have been
 tested from a clean install. The packages are marked `private` for now, because the final package name has not been
 chosen; once it is, removing that flag and running `npm publish` for each (section 12) makes
 `npm install -g <name>` work for anyone.
@@ -209,11 +209,11 @@ chosen; once it is, removing that flag and running `npm publish` for each (secti
 #### Least-privilege access (recommended)
 
 An administrator key works but is far more than this tool needs. `docs/iam/` has a policy that allows only what
-`deployer` does, and a script that creates a user with it:
+`shipzy` does, and a script that creates a user with it:
 
 ```sh
 AWS_PROFILE=<your-admin-profile> bash docs/iam/create-limited-user.sh     # creates user "deployer-cli", writes profile "deployer-lp"
-AWS_PROFILE=deployer-lp deployer status
+AWS_PROFILE=deployer-lp shipzy status
 ```
 
 The key is written straight into your local AWS profile and never printed. What the policy allows, by name:
@@ -230,7 +230,7 @@ the key as sensitive and do not share it.
 ### 4.3 Create the infrastructure
 
 ```sh
-deployer init
+shipzy init
 ```
 
 This takes about 5 minutes the first time (CloudFront is slow to create). It prints the bucket, distribution, default
@@ -242,7 +242,7 @@ The default region is `us-east-1`. Use `--region` to change it.
 ### 4.4 Your first deploy
 
 ```sh
-deployer deploy ./my-react-app --project my-app
+shipzy deploy ./my-react-app --project my-app
 ```
 
 When it finishes it prints the live URL (the CloudFront domain). Changes reach every CloudFront location in about
@@ -255,7 +255,7 @@ When it finishes it prints the live URL (the CloudFront domain). Changes reach e
 ### 5.1 Deploy from your machine
 
 ```sh
-deployer deploy ./my-react-app --project my-app
+shipzy deploy ./my-react-app --project my-app
 ```
 
 - `--project` defaults to the `name` in `package.json`.
@@ -265,10 +265,10 @@ deployer deploy ./my-react-app --project my-app
 ### 5.2 Deploy from AWS instead
 
 ```sh
-deployer deploy ./my-react-app --project my-app --remote          # watch the log
-deployer deploy ./my-react-app --project my-app --remote --detach # start it and come back later
-deployer builds -p my-app                                         # recent builds and their status
-deployer logs <build> -f                                          # follow a running build
+shipzy deploy ./my-react-app --project my-app --remote          # watch the log
+shipzy deploy ./my-react-app --project my-app --remote --detach # start it and come back later
+shipzy builds -p my-app                                         # recent builds and their status
+shipzy logs <build> -f                                          # follow a running build
 ```
 
 A remote build spends about 1.5 minutes in CodeBuild startup before your own build begins, so a local deploy is the
@@ -282,7 +282,7 @@ One time per project:
    limited to the repository, with **Contents: Read-only** and **Webhooks: Read and write**.
 2. Run:
    ```sh
-   deployer github connect -p my-app --repo owner/name
+   shipzy github connect -p my-app --repo owner/name
    ```
    Paste the token when asked (the input is hidden), or set `GITHUB_TOKEN` in the environment. The token is checked
    against the repository, stored in your account's Secrets Manager, and the webhook is registered on the repository.
@@ -292,7 +292,7 @@ After that, every push to the connected branch builds and deploys. You can also 
 without pushing:
 
 ```sh
-deployer github deploy -p my-app
+shipzy github deploy -p my-app
 ```
 
 See [`github`](#github-connect-deploy-disconnect-rotate-secret) in the reference for options, including deploying a
@@ -307,18 +307,18 @@ One time per stack, add a **wildcard preview domain** (it serves the previews of
 certificate and distribution, like a custom domain, and the same Route 53 / manual DNS rules apply):
 
 ```sh
-deployer domain add "*.preview.example.com" --preview
+shipzy domain add "*.preview.example.com" --preview
 ```
 
 One time per project, connect it to GitHub with previews on (and give the token **Pull requests: Read and write**,
 so the comment can be posted):
 
 ```sh
-deployer github connect -p my-app --repo owner/name --previews --reuse-token
+shipzy github connect -p my-app --repo owner/name --previews --reuse-token
 ```
 
-Then open a pull request into the connected branch. See what exists with `deployer previews`, or remove one by hand
-with `deployer previews rm -p my-app 12`.
+Then open a pull request into the connected branch. See what exists with `shipzy previews`, or remove one by hand
+with `shipzy previews rm -p my-app 12`.
 
 How it behaves:
 
@@ -330,20 +330,20 @@ How it behaves:
 - A failed preview build comments on the pull request; the previous preview, if any, keeps being served.
 - Previews never count towards the newest-10 retention of production deployments, and are never touched by
   `rollback`. Only the newest build of each pull request is kept.
-- Removing the preview domain (`deployer domain rm "*.preview.example.com"`) removes every preview on it.
+- Removing the preview domain (`shipzy domain rm "*.preview.example.com"`) removes every preview on it.
 
 ### 5.4 Environment variables for remote and GitHub builds
 
 Local deploys read your local `.env` as always. Remote and GitHub builds run in AWS and never receive `.env` files, so
-their build-time variables are stored with `deployer env`, encrypted in your account (AWS Systems Manager Parameter
+their build-time variables are stored with `shipzy env`, encrypted in your account (AWS Systems Manager Parameter
 Store, SecureString):
 
 ```sh
-deployer env set -p my-app VITE_API_URL https://api.example.com
-deployer env set -p my-app API_KEY             # no value given: type it (hidden) or pipe it in
-deployer env import -p my-app .env             # set every variable in a .env file
-deployer env ls -p my-app                      # names and scopes; values are never shown
-deployer env rm -p my-app VITE_API_URL
+shipzy env set -p my-app VITE_API_URL https://api.example.com
+shipzy env set -p my-app API_KEY             # no value given: type it (hidden) or pipe it in
+shipzy env import -p my-app .env             # set every variable in a .env file
+shipzy env ls -p my-app                      # names and scopes; values are never shown
+shipzy env rm -p my-app VITE_API_URL
 ```
 
 - A change applies to the **next build**, not to what is live now. Redeploy with `deploy --remote` or `github deploy`.
@@ -363,10 +363,10 @@ Every project already gets an address of its own (see "Your project's own addres
 a name you own, with HTTPS:
 
 ```sh
-deployer domain add app.example.com -p my-app     # certificate + distribution + DNS (about 5 to 15 minutes)
-deployer domain ls                                # hosts, project, stack, certificate and DNS state
-deployer domain verify app.example.com            # re-check everything; safe to run any time
-deployer domain rm app.example.com                # remove it completely (asks to confirm)
+shipzy domain add app.example.com -p my-app     # certificate + distribution + DNS (about 5 to 15 minutes)
+shipzy domain ls                                # hosts, project, stack, certificate and DNS state
+shipzy domain verify app.example.com            # re-check everything; safe to run any time
+shipzy domain rm app.example.com                # remove it completely (asks to confirm)
 ```
 
 `domain add` does this, and can be rerun at any point to continue where it stopped:
@@ -386,13 +386,13 @@ CloudFront address; otherwise just the address. Rollback moves the same set toge
 
 #### Your project's own address
 
-The first time a project is deployed with no `--host` and no custom domain, `deployer` creates a small CloudFront
+The first time a project is deployed with no `--host` and no custom domain, `shipzy` creates a small CloudFront
 distribution for it (about 5 minutes, once) and records its address, like `https://d1abc2def3ghij.cloudfront.net`.
 Every later deploy of that project, from your machine, from AWS or from a push, updates that same address, and
 other projects have theirs, so any number of projects can be live at once.
 
 - It is the same kind of stack as a custom domain, named `<stack>-site-<project>`; it reuses the main stack's router,
-  routing table and bucket access. `deployer delete` removes it with the project, and `destroy` removes all of them.
+  routing table and bucket access. `shipzy delete` removes it with the project, and `destroy` removes all of them.
 - The name is chosen by CloudFront, not by you. For a readable address add a custom domain.
 - The stack's own **default URL** (printed by `init`) is no longer where projects land. A project that already holds
   it from before keeps using it; to move such a project to an address of its own, delete and redeploy it, or pass
@@ -419,9 +419,9 @@ the domain's DNS to Route 53.
 ### 5.6 Roll back
 
 ```sh
-deployer list -p my-app               # shows deployment ids and which is live
-deployer rollback -p my-app           # back to the previous deployment
-deployer rollback -p my-app --to d-20261029T104026-4dc09a   # or to a specific one
+shipzy list -p my-app               # shows deployment ids and which is live
+shipzy rollback -p my-app           # back to the previous deployment
+shipzy rollback -p my-app --to d-20261029T104026-4dc09a   # or to a specific one
 ```
 
 It takes effect in about 30 seconds. Only recorded deployments can be rolled back to, and only the newest 10 are kept
@@ -430,18 +430,18 @@ by default.
 ### 5.7 See what you have
 
 ```sh
-deployer status        # account, stack, URL, build setup, last build, totals
-deployer list          # every project: where it is live, how old, auto-deploy source, versions, size
-deployer list -p my-app
+shipzy status        # account, stack, URL, build setup, last build, totals
+shipzy list          # every project: where it is live, how old, auto-deploy source, versions, size
+shipzy list -p my-app
 ```
 
 ### 5.8 Clean up
 
 ```sh
-deployer prune -p my-app --dry-run    # see what would be deleted
-deployer prune -p my-app
-deployer delete -p my-app             # remove a project completely (asks you to type its name)
-deployer destroy                      # remove the entire stack (asks you to type the stack name)
+shipzy prune -p my-app --dry-run    # see what would be deleted
+shipzy prune -p my-app
+shipzy delete -p my-app             # remove a project completely (asks you to type its name)
+shipzy destroy                      # remove the entire stack (asks you to type the stack name)
 ```
 
 `delete` removes the project's routes, every deployment folder, its uploaded sources, its environment variables, its custom
@@ -450,7 +450,7 @@ something else is deployed.
 
 `destroy` removes the custom domains and the preview domain first (each one's distribution, certificate and the DNS
 records this tool made), then the webhooks, variables and buckets, then the stack. If a domain cannot be removed it stops
-**before** deleting anything else and tells you which one; fix it (or run `deployer domain rm <host>`) and run `destroy`
+**before** deleting anything else and tells you which one; fix it (or run `shipzy domain rm <host>`) and run `destroy`
 again. A `destroy` that was interrupted can be run again: it picks up where it stopped, and `domain rm` also works on a
 stack left in `DELETE_FAILED`.
 
@@ -459,15 +459,15 @@ stack left in `DELETE_FAILED`.
 `--stack-name` makes an independent copy in the same account, for example a staging environment:
 
 ```sh
-deployer --stack-name Staging init
-deployer --stack-name Staging deploy ./my-react-app
+shipzy --stack-name Staging init
+shipzy --stack-name Staging deploy ./my-react-app
 ```
 
 ### 5.10 The local dashboard
 
 ```sh
-deployer dashboard                # starts it and opens your browser
-deployer dashboard --port 4300 --no-open
+shipzy dashboard                # starts it and opens your browser
+shipzy dashboard --port 4300 --no-open
 ```
 
 A web UI for everything above, started from a terminal and reachable **only from your own computer**
@@ -476,7 +476,7 @@ before `dashboard`). Press Ctrl-C in the terminal to stop it.
 
 | Screen | What you do there |
 |---|---|
-| Overview | Totals, your most recent projects as cards, the last build and the infrastructure. If the stack does not exist it tells you to run `deployer init` |
+| Overview | Totals, your most recent projects as cards, the last build and the infrastructure. If the stack does not exist it tells you to run `shipzy init` |
 | Projects | A card per project (live address, repository, last deploy, versions, size), with search once there are more than three |
 | New deployment | Deploy from **a folder on this computer** (type or browse to it; build here or in AWS) or from **a GitHub repository** (pick from your repositories after **Connect GitHub**, or paste a link; token from the login, pasted, or the stored one) |
 | Project: Deployments | History with live badges, "Serve this one" (rollback), preview and run cleanup, delete the project |
@@ -490,15 +490,15 @@ before `dashboard`). Press Ctrl-C in the terminal to stop it.
 page can be opened on a given tab with `?tab=domains` (also `environment`, `github`, `previews`, `builds`).
 
 **Installing it (optional).** The dashboard is not part of the small CLI install. The first time you run
-`deployer dashboard` it says so and asks `Download and install it now? [y/N]`. Answer `n` and nothing is downloaded
-(the CLI works fully without it). Answer `y`, or run `deployer dashboard --install` yourself, and the matching version
-is installed into `~/.deployer/dashboard-app` with npm; later runs just start it. When the CLI is updated the dashboard
-is out of date until you run `deployer dashboard --install` again. Without a terminal (a script, CI) it prints the
-command instead of asking. Remove it with `rm -rf ~/.deployer/dashboard-app`. Running from this repository, the build
+`shipzy dashboard` it says so and asks `Download and install it now? [y/N]`. Answer `n` and nothing is downloaded
+(the CLI works fully without it). Answer `y`, or run `shipzy dashboard --install` yourself, and the matching version
+is installed into `~/.shipzy/dashboard-app` with npm; later runs just start it. When the CLI is updated the dashboard
+is out of date until you run `shipzy dashboard --install` again. Without a terminal (a script, CI) it prints the
+command instead of asking. Remove it with `rm -rf ~/.shipzy/dashboard-app`. Running from this repository, the build
 already includes it and nothing is asked.
 
 **How it works.** The dashboard is a Next.js app, a separate package from the CLI. Reading data and every action run the
-`deployer` command itself (with `--json` for reads), so behaviour is identical to the terminal and nothing is
+`shipzy` command itself (with `--json` for reads), so behaviour is identical to the terminal and nothing is
 re-implemented. Actions run as background jobs; their output streams to the browser live and is kept in memory while
 the dashboard runs. Closing the browser tab does not stop a job; stopping the dashboard does (a build already started
 in AWS keeps running there).
@@ -528,7 +528,7 @@ One-time setup (about two minutes, free). Until it is done, the page shows these
 2. Name: anything (for example `Deployer`). Homepage URL and Authorization callback URL: `http://127.0.0.1`.
 3. Register it, then tick **Enable Device Flow** and save. Do **not** generate a client secret; it is not needed.
 4. Copy the **Client ID** (it is not a secret) and paste it into the box on the page, then **Save**. It is remembered in
-   `~/.deployer/dashboard.json`, so this is done once. (Setting `DEPLOYER_GITHUB_CLIENT_ID` in the environment works too
+   `~/.shipzy/dashboard.json`, so this is done once. (Setting `DEPLOYER_GITHUB_CLIENT_ID` in the environment works too
    and takes precedence.)
 
 What it does with the login:
@@ -628,7 +628,7 @@ Removes GitHub webhooks, empties both buckets and deletes the stack. `-y, --yes`
 |---|---|
 | `--port <number>` | Port to listen on (default 4173; `127.0.0.1` only) |
 | `--no-open` | Print the address without opening the browser |
-| `--install` | Download or update the optional dashboard package first, without asking (installed in `~/.deployer/dashboard-app`) |
+| `--install` | Download or update the optional dashboard package first, without asking (installed in `~/.shipzy/dashboard-app`) |
 
 If the dashboard is not installed, the command asks whether to download it (or prints how, without a terminal).
 
@@ -649,8 +649,8 @@ If the dashboard is not installed, the command asks whether to download it (or p
 | `env rm <name>` | `-p, --project`, `--preview` | Removes a variable |
 
 ### `previews`, `previews rm`
-`deployer previews [-p <project>] [--json]` lists the preview domain and the open previews.
-`deployer previews rm <pr> -p <project>` takes one down. Previews are made by `github connect --previews` plus a
+`shipzy previews [-p <project>] [--json]` lists the preview domain and the open previews.
+`shipzy previews rm <pr> -p <project>` takes one down. Previews are made by `github connect --previews` plus a
 `domain add "*.…" --preview` (section 5.3).
 
 ### `github connect`, `deploy`, `disconnect`, `rotate-secret`
@@ -672,7 +672,7 @@ If the dashboard is not installed, the command asks whether to download it (or p
 - Routes that work from the site root, such as React Router's `BrowserRouter`. A Vite `base` or a CRA `homepage`
   pointing at a sub-path will break asset loading.
 - **Environment variables are baked in at build time.** For a local deploy they come from your local `.env`. Remote
-  and GitHub builds never receive `.env` files; give them their variables with `deployer env` (section 5.4).
+  and GitHub builds never receive `.env` files; give them their variables with `shipzy env` (section 5.4).
   Never put secrets in variables your framework exposes to the browser: they end up in public JavaScript.
 - Calls to your own backend need CORS to allow your site's URL.
 - Project names use lowercase letters, digits and dashes, start with a letter or digit, and are at most 63 characters.
@@ -684,11 +684,11 @@ If the dashboard is not installed, the command asks whether to download it (or p
 export default { output: 'export', images: { unoptimized: true } };
 ```
 
-Then `next build` writes the whole site, one HTML file per page, to `out/`, and `deployer deploy` uploads that. Both the
+Then `next build` writes the whole site, one HTML file per page, to `out/`, and `shipzy deploy` uploads that. Both the
 App Router and the Pages Router work, and dynamic routes work when they list their pages (`generateStaticParams` or
 `getStaticPaths`). Pages are pre-rendered at build time; they still run in the browser after loading.
 
-What a static export cannot do, and `deployer` refuses up front rather than deploying a site that behaves differently:
+What a static export cannot do, and `shipzy` refuses up front rather than deploying a site that behaves differently:
 middleware (`middleware.ts`, `proxy.ts`), API routes (`pages/api`), `getServerSideProps`, per-request rendering,
 revalidation (ISR), and Next's image resizing (hence `images.unoptimized`). `redirects`, `rewrites` and `headers` in
 `next.config` are ignored by a static export. Route handlers that only answer `GET` are built to files and work.
@@ -790,10 +790,10 @@ settings keep S3 storage bounded.
 - **Static sites only.** Vite, Create React App and static Next.js exports. Server-rendered Next.js (API routes, middleware, per-request rendering) is not supported.
 - **Remote builds are slow to start** (about 1.5 minutes before your build begins).
 - **A path with no file returns a real 404.** CloudFront falls back to a small page kept at the root of the sites
-  bucket (`deployer init` puts it there), and that page swaps itself for the site's own `404.html` when it has one (a
+  bucket (`shipzy init` puts it there), and that page swaps itself for the site's own `404.html` when it has one (a
   Next.js export does). Addresses and custom domains created before this was added keep the old plain 403 until they
   are recreated (delete and redeploy the project, or `domain rm` and `domain add`); the stack's own default address
-  gets it on the next `deployer init`.
+  gets it on the next `shipzy init`.
 - **A GitHub token is always required** to connect a repository, even a public one: it registers the webhook and is
   sent when cloning. One token serves a whole stack.
 - **Rollback reaches back 10 deployments by default** (`--keep` changes that).
@@ -812,15 +812,15 @@ settings keep S3 storage bounded.
 |---|---|
 | `npm ci` fails with `ERESOLVE` (a peer-dependency conflict) | Fix the versions in the project, or deploy with a looser install: `--install-command "npm ci --legacy-peer-deps"`. The CLI repeats this hint when it sees the error. |
 | The CLI hangs on AWS calls, especially routing-table writes | Your network advertises IPv6 but drops it. The CLI already prefers IPv4. If you run your own scripts against the AWS SDK, start Node with `NODE_OPTIONS="--dns-result-order=ipv4first --no-network-family-autoselection"`. |
-| `GitHub said 403: Resource not accessible by personal access token` | The token lacks the **Webhooks: Read and write** permission. Edit the token's permissions on GitHub (the token itself does not change), then run `deployer github rotate-secret`, which registers the webhook. |
+| `GitHub said 403: Resource not accessible by personal access token` | The token lacks the **Webhooks: Read and write** permission. Edit the token's permissions on GitHub (the token itself does not change), then run `shipzy github rotate-secret`, which registers the webhook. |
 | `GitHub rejected the token` | Expired, revoked or mistyped. Run `github connect` again with a valid token. |
 | `Repository … was not found, or the token cannot see it` | The token was not given access to that repository. |
 | `Could not fetch <repo> at <sha>` in a build log | The repository does not exist or the stored token cannot read it. Store a new token with `github connect`. |
 | `Build output not found: expected dist/index.html or build/index.html` | The build ran but produced no site. Check the project's build script and output folder. |
 | `This is a Next.js project that is not set up for a static export` | Add `output: 'export'` (and `images: { unoptimized: true }`) to `next.config`. A project that needs a server cannot be deployed. |
 | `Image Optimization using the default loader is not compatible with export` | Add `images: { unoptimized: true }` to `next.config`. |
-| `deployer: command not found` | The link is gone or your PATH does not include npm's global bin folder (`npm prefix -g`). Run `npm link` again in `apps/cli`. |
-| `Stack "Deployer" not found. Run deployer init first.` | The stack does not exist in this account and region, or you are using a different `--profile`, `--region` or `--stack-name`. |
+| `shipzy: command not found` | The link is gone or your PATH does not include npm's global bin folder (`npm prefix -g`). Run `npm link` again in `apps/cli`. |
+| `Stack "Deployer" not found. Run shipzy init first.` | The stack does not exist in this account and region, or you are using a different `--profile`, `--region` or `--stack-name`. |
 | `domain add` says the hostname is already used by another CloudFront distribution | A hostname can be attached to one distribution only. Remove it from the other distribution (or its stack) first, then rerun. |
 | `domain add` waits for the certificate for a long time | Its validation CNAME is not visible. With Route 53 check the zone is delegated (`dig NS <zone> @8.8.8.8`); with manual DNS check you added the record exactly as printed. |
 | `domain verify` says DNS does not reach the distribution | The hostname's CNAME or alias is missing or still propagating. Compare with the record `domain add` printed. |
@@ -834,7 +834,7 @@ settings keep S3 storage bounded.
 ## 12. The repository, and working on it
 
 ```
-apps/cli/            the `deployer` command-line tool
+apps/cli/            the `shipzy` command-line tool
   src/commands/      one file per command (deploy, remote-deploy, list, github, …)
   src/lib/           helpers: AWS access, building, zipping, GitHub API, log streaming, formatting
 packages/core/       code shared by the CLI and the Lambdas: routing table, history, pruning, object helpers
@@ -846,13 +846,13 @@ examples/sample/     a small React app used for testing
 
 The code is TypeScript in npm workspaces. `npm run build` runs, in order: `core` → `engine` (bundles the Lambdas into
 `apps/cli/assets/engine.zip`) → `stack` (writes `apps/cli/assets/template.json` and copies the build script) → `cli`
-(type-checks, then bundles everything into the single file `apps/cli/dist/deployer.mjs`).
+(type-checks, then bundles everything into the single file `apps/cli/dist/shipzy.mjs`).
 The CLI ships the template, engine zip and build script as assets, and `init` uploads them. That is why the stack
 needs no `cdk bootstrap`. The published package has no runtime dependencies: AWS request signing for the routing
 table uses a pure-JavaScript implementation, so nothing native is installed or shipped to Lambda.
 
 **Publishing (two packages).** Both are built by `npm run build`.
-- The CLI: `npm pack -w apps/cli` (~0.9 MB: the bundled `dist/deployer.mjs` plus the template, engine zip and build
+- The CLI: `npm pack -w apps/cli` (~0.9 MB: the bundled `dist/shipzy.mjs` plus the template, engine zip and build
   script; `assets/dashboard` is excluded).
 - The dashboard: `cd apps/dashboard/dist-package && npm pack` (~16 MB). It is the Next.js standalone server with every
   `node_modules` folder renamed `_nm`, because npm never packs a folder with that name; the CLI renames them back when
@@ -888,7 +888,7 @@ table uses a pure-JavaScript implementation, so nothing native is installed or s
 | GitHub push deploys, secret rotation | done, including a real push from a real repository |
 | Concurrency safety (history file and routing table) | done |
 | Build-time environment variables (production and preview scopes) | done |
-| Local dashboard (`deployer dashboard`): deploy from a folder or GitHub, rollback, domains, variables, live logs | done, driven through its API against a real account |
+| Local dashboard (`shipzy dashboard`): deploy from a folder or GitHub, rollback, domains, variables, live logs | done, driven through its API against a real account |
 | Custom domains: Route 53 automatic and manual DNS, side-by-side projects, removal | done, on a real delegated subdomain |
 | Pull request previews: wildcard domain, webhook, engine, comment, `previews` commands, dashboard tab | done, including a real pull request: open, push again, close |
 

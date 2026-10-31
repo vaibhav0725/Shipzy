@@ -7,7 +7,7 @@ import { listProjects } from '../lib/projects.js';
 
 export async function status(opts: { json?: boolean }, global: GlobalOptions): Promise<void> {
   const [me, stack] = await Promise.all([whoAmI(), findStack(global.stackName)]);
-  if (!stack) throw new Error(`Stack "${global.stackName}" not found. Run \`deployer init\` first.`);
+  if (!stack) throw new Error(`Stack "${global.stackName}" not found. Run \`shipzy init\` first.`);
   const out = readOutputs(stack);
   const [projects, [lastBuild], previewDomains] = await Promise.all([
     listProjects(out),
@@ -48,7 +48,7 @@ export async function status(opts: { json?: boolean }, global: GlobalOptions): P
     ['Stack', `${ui.name(summary.stack.name)}  ${colorStatus(summary.stack.status ?? "-")}`],
     ['Bucket', summary.bucket],
     ['CloudFront', `${summary.distribution.id}  ${ui.url(summary.distribution.url)}`],
-    ['Builds', summary.builds.engine ? `${out.buildProject} (engine installed)` : 'not set up: run `deployer init`'],
+    ['Builds', summary.builds.engine ? `${out.buildProject} (engine installed)` : 'not set up: run `shipzy init`'],
     ['Webhook', out.webhookUrl ?? '-'],
     ['GitHub', `${summary.githubProjects} project(s) deploy on push`],
     [

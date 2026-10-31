@@ -43,7 +43,7 @@ const reply = (statusCode: number, body: unknown) => ({
   body: JSON.stringify(body),
 });
 
-// Cached briefly so a rotated secret (`deployer github rotate-secret`) takes effect within minutes
+// Cached briefly so a rotated secret (`shipzy github rotate-secret`) takes effect within minutes
 // without redeploying anything.
 const SECRET_TTL_MS = 5 * 60_000;
 let cached: { value: string; fetchedAt: number } | undefined;

@@ -52,7 +52,7 @@ case "$SOURCE_TYPE" in
     if ! "${FETCH[@]}"; then
       echo "Could not fetch ${SOURCE_REPO} at ${SOURCE_REF:0:7}."
       echo "Check that the repository exists and that the stored GitHub token can read it."
-      echo "(Store a new token with: deployer github connect -p <project> --repo ${SOURCE_REPO})"
+      echo "(Store a new token with: shipzy github connect -p <project> --repo ${SOURCE_REPO})"
       exit 1
     fi
     git -C "$SRC" checkout -q FETCH_HEAD

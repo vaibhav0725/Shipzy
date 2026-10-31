@@ -1,4 +1,4 @@
-// Bundles the Lambda handlers into apps/cli/assets/engine.zip. The zip is deterministic so `deployer init` can key it by content hash.
+// Bundles the Lambda handlers into apps/cli/assets/engine.zip. The zip is deterministic so `shipzy init` can key it by content hash.
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';

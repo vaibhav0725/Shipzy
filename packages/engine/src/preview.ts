@@ -87,7 +87,7 @@ export async function promotePreview(event: PreviewPromoteEvent) {
 
   const { repo } = await previewSource(event.project);
   const base = (await readPreviewBases(bucket))[0];
-  if (!base) throw new Error('No preview domain is set up. Add one with: deployer domain add "*.preview.<your domain>" --preview');
+  if (!base) throw new Error('No preview domain is set up. Add one with: shipzy domain add "*.preview.<your domain>" --preview');
   const host = previewHost(event.project, pr, base);
   const target = routeTarget(event.project, event.id);
   const token = await githubToken();
@@ -175,7 +175,7 @@ export async function previewFailed(event: PreviewFailedEvent) {
       token,
       repo,
       event.pr,
-      `**Preview build failed** for \`${event.sha.slice(0, 7)}\`.\n\nSee the log with \`deployer builds -p ${event.project}\` and \`deployer logs <build>\`. The previous preview, if there was one, is still being served.`,
+      `**Preview build failed** for \`${event.sha.slice(0, 7)}\`.\n\nSee the log with \`shipzy builds -p ${event.project}\` and \`shipzy logs <build>\`. The previous preview, if there was one, is still being served.`,
     );
   }
   return { ok: true, project: event.project, pr: event.pr };
