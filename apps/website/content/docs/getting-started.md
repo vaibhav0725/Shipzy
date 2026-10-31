@@ -15,8 +15,10 @@ shipzy deploys React and Next.js sites to **your own AWS account**. This guide t
 
 ## 1. Install the CLI
 
+shipzy is in **beta**, so the install command names the `beta` tag. It works end to end, but read [limits and roadmap](/docs/limits) before you rely on it.
+
 ```sh
-npm install -g shipzy
+npm install -g shipzy@beta
 shipzy --version
 ```
 

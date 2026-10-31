@@ -6,8 +6,8 @@ export const site = {
     'shipzy deploys React and Next.js sites to S3 and CloudFront in your own AWS account: instant rollbacks, preview URLs, custom domains and GitHub push deploys. Nothing runs on our servers.',
   /** the address the site is served at (used for links in the sitemap and social cards) */
   url: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://shipzy.quantav.xyz',
-  /** the public repository; leave empty until it exists and the link is hidden */
-  repoUrl: process.env.NEXT_PUBLIC_REPO_URL ?? '',
-  install: 'npm install -g shipzy',
+  /** the public repository (an empty value hides the links) */
+  repoUrl: process.env.NEXT_PUBLIC_REPO_URL ?? 'https://github.com/vaibhav0725/Shipzy',
+  install: 'npm install -g shipzy@beta',
   license: 'Apache-2.0',
 };

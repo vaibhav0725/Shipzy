@@ -1,7 +1,7 @@
 {
   "name": "shipzy-dashboard",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.1.0-beta.1",
+  "private": false,
   "license": "Apache-2.0",
   "description": "Local web dashboard for shipzy (started by `shipzy dashboard`)",
   "scripts": {
@@ -19,5 +19,30 @@
     "next": "16.4.1",
     "react": "19.2.9",
     "react-dom": "19.2.9"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vaibhav0725/Shipzy.git"
+  },
+  "homepage": "https://shipzy.quantav.xyz",
+  "bugs": {
+    "url": "https://github.com/vaibhav0725/Shipzy/issues"
+  },
+  "keywords": [
+    "aws",
+    "s3",
+    "cloudfront",
+    "deploy",
+    "static-site",
+    "nextjs",
+    "react",
+    "vite",
+    "self-hosted",
+    "vercel-alternative"
+  ],
+  "author": "vaibhav0725",
+  "publishConfig": {
+    "access": "public",
+    "tag": "beta"
   }
 }

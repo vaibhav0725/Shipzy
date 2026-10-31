@@ -54,6 +54,11 @@ fs.writeFileSync(
       description: source.description,
       license: source.license,
       private: source.private,
+      repository: source.repository,
+      homepage: source.homepage,
+      bugs: source.bugs,
+      keywords: source.keywords,
+      author: source.author,
       engines: { node: '>=20' },
       files: ['app'],
     },
@@ -61,4 +66,5 @@ fs.writeFileSync(
     2,
   ) + '\n',
 );
+for (const f of ['README.md', 'LICENSE']) fs.copyFileSync(path.join(app, f), path.join(pkgDir, f));
 console.log('Staged the installable dashboard package in apps/dashboard/dist-package');

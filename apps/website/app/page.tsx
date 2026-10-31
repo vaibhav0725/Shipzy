@@ -256,7 +256,7 @@ export default function Home() {
               </div>
             </div>
             <div className="cmds">
-              <div><b>$ </b>npm install -g shipzy</div>
+              <div><b>$ </b>npm install -g shipzy@beta</div>
               <div><b>$ </b>shipzy init</div>
               <div><b>$ </b>shipzy deploy ./my-app</div>
               <div className="dim"># ✔ Live: https://my-app.example.com</div>
