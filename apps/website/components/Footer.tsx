@@ -30,6 +30,7 @@ export default function Footer() {
         <div>
           <h4>Project</h4>
           {site.repoUrl && <a href={site.repoUrl}>GitHub</a>}
+          <a href={site.npmUrl}>npm</a>
           <Link href="/docs/limits">Limits and roadmap</Link>
           <Link href="/docs/troubleshooting">Troubleshooting</Link>
           <span style={{ display: 'block', padding: '3px 0' }}>License: {site.license}</span>

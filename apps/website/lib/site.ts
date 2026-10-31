@@ -8,6 +8,7 @@ export const site = {
   url: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://shipzy.quantav.xyz',
   /** the public repository (an empty value hides the links) */
   repoUrl: process.env.NEXT_PUBLIC_REPO_URL ?? 'https://github.com/vaibhav0725/Shipzy',
+  npmUrl: 'https://www.npmjs.com/package/shipzy',
   install: 'npm install -g shipzy@beta',
   license: 'Apache-2.0',
 };
