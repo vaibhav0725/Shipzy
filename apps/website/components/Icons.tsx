@@ -26,6 +26,7 @@ const paths: Record<string, ReactNode> = {
   monitor: <><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></>,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   x: <path d="M6 6l12 12M18 6 6 18" />,
+  search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></>,
   book: <><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5Z" /><path d="M4 19a2 2 0 0 1 2-2h13" /></>,
   server: <><rect x="3" y="4" width="18" height="6" rx="1.500" /><rect x="3" y="14" width="18" height="6" rx="1.500" /><path d="M7 7h.01M7 17h.01" /></>,
   pr: <><circle cx="6" cy="6" r="2" /><circle cx="6" cy="18" r="2" /><circle cx="18" cy="18" r="2" /><path d="M6 8v8M18 16V9a3 3 0 0 0-3-3h-2m0 0 2-2m-2 2 2 2" /></>,
@@ -41,12 +42,11 @@ export function Icon({ name, size }: { name: IconName; size?: number }) {
   );
 }
 
-/** The brand mark: a rounded square with a rising triangle (a deploy going up). */
+/** The brand mark: an ember square with a rising triangle (a deploy going up). */
 export function Logo() {
   return (
-    <svg viewBox="0 0 28 28" aria-hidden="true">
-      <rect width="28" height="28" rx="8" fill="var(--accent)" />
-      <path d="M14 7.500 20.500 19h-13L14 7.500Z" fill="var(--accent-text)" />
-    </svg>
+    <span className="mark" aria-hidden="true">
+      <svg viewBox="0 0 28 28"><path d="M14 5.5 22.5 21h-17Z" /></svg>
+    </span>
   );
 }

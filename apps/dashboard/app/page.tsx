@@ -6,8 +6,19 @@ import { Icon } from '@/components/Icons';
 import ProjectCard from '@/components/ProjectCard';
 import { formatBytes, ProjectSummary, Status, timeAgo, useApi } from '@/lib/client';
 
+/** "46 MB" as a big number with a small unit. */
+function Size({ bytes }: { bytes: number }) {
+  const [n, unit] = formatBytes(bytes).split(' ');
+  return (
+    <>
+      {n}
+      <small>{unit}</small>
+    </>
+  );
+}
+
 export default function Overview() {
-  const { data, error, loading, reload } = useApi<Status>('/api/status', { interval: 15000 });
+  const { data, error, reload } = useApi<Status>('/api/status', { interval: 15000 });
   const projects = useApi<ProjectSummary[]>('/api/projects', { interval: 20000 });
   const recent = [...(projects.data ?? [])].sort((a, b) => Date.parse(b.lastDeployedAt ?? '0') - Date.parse(a.lastDeployedAt ?? '0')).slice(0, 6);
 
@@ -34,34 +45,34 @@ export default function Overview() {
         <div className="notice bad">
           <strong>Could not read the stack.</strong> {error}
           {/not found/i.test(error) && (
-            <p style={{ margin: '8px 0 0' }}>
+            <p style={{ margin: '0.5rem 0 0' }}>
               Create it from a terminal with <code>shipzy init</code>, then refresh this page.
             </p>
           )}
         </div>
       )}
 
-      <div className="grid">
+      <div className="stats">
         {data ? (
           <>
             <div className="stat"><div className="l">Projects</div><div className="n">{data.projects}</div></div>
             <div className="stat"><div className="l">Live sites</div><div className="n">{data.liveSites}</div></div>
             <div className="stat"><div className="l">Deployments stored</div><div className="n">{data.deployments}</div></div>
-            <div className="stat"><div className="l">Storage used</div><div className="n">{formatBytes(data.bytes)}</div></div>
+            <div className="stat"><div className="l">Storage used</div><div className="n"><Size bytes={data.bytes} /></div></div>
           </>
         ) : (
-          !error && [0, 1, 2, 3].map((i) => <div className="stat" key={i}><Skeleton width={70} height={12} /><div style={{ height: 8 }} /><Skeleton width={90} height={26} /></div>)
+          !error && [0, 1, 2, 3].map((i) => <div className="stat" key={i}><Skeleton width={70} height={12} /><div style={{ height: 10 }} /><Skeleton width={90} height={28} /></div>)
         )}
       </div>
 
       <div className="section">
         <h2>Recent projects</h2>
-        {(projects.data?.length ?? 0) > 6 && <Link href="/projects">View all {projects.data!.length}</Link>}
+        {(projects.data?.length ?? 0) > 6 && <Link href="/projects">View all →</Link>}
       </div>
       <ErrorNotice message={projects.error} />
       {projects.loading && !projects.data && (
         <div className="cards">
-          {[0, 1, 2].map((i) => <div className="pcard" key={i}><Skeleton height={38} /><Skeleton width="70%" /><Skeleton width="50%" /></div>)}
+          {[0, 1, 2].map((i) => <div className="pcard" key={i} style={{ padding: '1rem', gap: '0.75rem' }}><Skeleton height={34} /><Skeleton width="70%" /><Skeleton width="50%" /></div>)}
         </div>
       )}
       {projects.data && projects.data.length === 0 && (
@@ -73,38 +84,34 @@ export default function Overview() {
       {recent.length > 0 && <div className="cards">{recent.map((p) => <ProjectCard key={p.name} project={p} />)}</div>}
 
       {data && (
-        <div className="cols" style={{ marginTop: 28 }}>
-          <div className="card">
-            <div className="card-head"><h2>Last build</h2></div>
+        <div className="cols" style={{ marginTop: '1.75rem' }}>
+          <div className="panel">
+            <div className="panel-head">
+              <h2>Last build</h2>
+              {data.builds.last && <StatusBadge status={data.builds.last.status} />}
+            </div>
             {data.builds.last ? (
-              <dl className="kv">
-                <dt>Result</dt><dd><StatusBadge status={data.builds.last.status} /></dd>
-                <dt>Project</dt><dd>{data.builds.last.project ? <Link href={`/projects/${data.builds.last.project}`}>{data.builds.last.project}</Link> : '-'}</dd>
-                <dt>When</dt><dd>{timeAgo(data.builds.last.startedAt)}</dd>
-                <dt>Took</dt><dd>{data.builds.last.took ?? '-'}</dd>
-                <dt>GitHub</dt><dd>{data.githubProjects} project{data.githubProjects === 1 ? '' : 's'} deploy on push</dd>
-              </dl>
+              <>
+                <div className="kvrow"><span>Project</span><span>{data.builds.last.project ? <Link href={`/projects/${data.builds.last.project}`}>{data.builds.last.project}</Link> : '-'}</span></div>
+                <div className="kvrow"><span>When</span><span>{timeAgo(data.builds.last.startedAt)}</span></div>
+                <div className="kvrow"><span>Took</span><span>{data.builds.last.took ?? '-'}</span></div>
+                <div className="kvrow"><span>GitHub</span><span>{data.githubProjects} project{data.githubProjects === 1 ? '' : 's'} deploy on push</span></div>
+              </>
             ) : (
-              <p className="muted">No builds in AWS yet. Deploys from a GitHub repository, or with &quot;build in AWS&quot;, show up here.</p>
+              <p className="note" style={{ border: 0 }}>No builds in AWS yet. Deploys from a GitHub repository, or with &quot;build in AWS&quot;, show up here.</p>
             )}
           </div>
-          <div className="card">
-            <div className="card-head"><h2>Infrastructure</h2><StatusBadge status={data.stack.status} /></div>
-            <dl className="kv">
-              <dt>Account</dt><dd className="mono">{data.account}</dd>
-              <dt>Region</dt><dd>{data.region ?? '-'}</dd>
-              <dt>Stack</dt><dd>{data.stack.name}</dd>
-              <dt>Remote builds</dt><dd>{data.builds.engine ? 'ready' : <>not set up: run <code>shipzy init</code></>}</dd>
-              <dt>Default URL</dt>
-              <dd>
-                <a href={data.distribution.url} target="_blank" rel="noreferrer">{data.distribution.url.replace('https://', '')}</a>
-                <div className="muted small">Projects get their own address; this one only serves projects deployed to it earlier.</div>
-              </dd>
-            </dl>
+          <div className="panel">
+            <div className="panel-head"><h2>Infrastructure</h2><StatusBadge status={data.stack.status} /></div>
+            <div className="kvrow"><span>Account</span><span>{data.account}</span></div>
+            <div className="kvrow"><span>Region</span><span>{data.region ?? '-'}</span></div>
+            <div className="kvrow"><span>Stack</span><span>{data.stack.name}</span></div>
+            <div className="kvrow"><span>Remote builds</span><span style={{ color: data.builds.engine ? 'var(--ok)' : undefined }}>{data.builds.engine ? 'ready' : 'not set up: run shipzy init'}</span></div>
+            <div className="kvrow"><span>Default URL</span><span><a href={data.distribution.url} target="_blank" rel="noreferrer">{data.distribution.url.replace('https://', '')}</a></span></div>
+            <p className="note">Projects get their own address; the default URL only serves projects deployed to it earlier.</p>
           </div>
         </div>
       )}
-      {loading && !data && null}
     </>
   );
 }

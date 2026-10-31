@@ -12,11 +12,14 @@ const lineClass = (l: string) =>
 export default function JobLog({
   jobId,
   running,
+  meta,
   onEnd,
   onLines,
 }: {
   jobId: string;
   running?: boolean;
+  /** extra words in the title bar, e.g. the kind of action */
+  meta?: string;
   onEnd?: (end: End) => void;
   onLines?: (lines: string[]) => void;
 }) {
@@ -55,8 +58,9 @@ export default function JobLog({
   return (
     <div className="term">
       <div className="term-bar">
-        <span className={`dot ${running ? 'pulse' : ''}`} style={{ color: running ? '#f2b653' : '#6c7586' }} />
-        <span>{running ? 'Running' : 'Output'}</span>
+        <span className={`dot ${running ? 'pulse' : ''}`} style={{ color: running ? 'var(--warn)' : 'var(--ok)' }} />
+        <span className="t">{running ? 'Running' : 'Output'}</span>
+        <span>· job {jobId}{meta ? ` · ${meta}` : ''}</span>
         <span className="spacer" />
         <button type="button" onClick={() => setFollow((f) => !f)} aria-pressed={follow}>
           {follow ? 'Following' : 'Follow'}
@@ -73,10 +77,11 @@ export default function JobLog({
           if (atEnd && !followRef.current) setFollow(true);
         }}
       >
-        {lines.length === 0 ? <span className="dim">Waiting for output...</span> : null}
+        {lines.length === 0 ? <div className="ln"><span className="no" /><span className="tx dim">Waiting for output...</span></div> : null}
         {lines.map((l, i) => (
-          <div key={i} className={lineClass(l)}>
-            {l || ' '}
+          <div key={i} className="ln">
+            <span className="no">{i + 1}</span>
+            <span className={`tx ${lineClass(l) ?? ''}`}>{l || ' '}</span>
           </div>
         ))}
       </div>

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import { IBM_Plex_Mono, IBM_Plex_Sans } from 'next/font/google';
 import type { ReactNode } from 'react';
 import CodeCopy from '@/components/CodeCopy';
 import Footer from '@/components/Footer';
@@ -7,8 +7,8 @@ import Header from '@/components/Header';
 import { site } from '@/lib/site';
 import './globals.css';
 
-const sans = Inter({ subsets: ['latin'], variable: '--font-sans', display: 'swap' });
-const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono', display: 'swap' });
+const sans = IBM_Plex_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--font-sans', display: 'swap' });
+const mono = IBM_Plex_Mono({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-mono', display: 'swap' });
 
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   twitter: { card: 'summary', title: `${site.name}: ${site.tagline}`, description: site.description },
 };
 
-export const viewport: Viewport = { themeColor: [{ media: '(prefers-color-scheme: light)', color: '#fafafa' }, { media: '(prefers-color-scheme: dark)', color: '#0a0a0a' }] };
+export const viewport: Viewport = { themeColor: [{ media: '(prefers-color-scheme: light)', color: '#f3f0ea' }, { media: '(prefers-color-scheme: dark)', color: '#100f0e' }] };
 
 // Applies the saved theme before the first paint (and accepts ?theme=light|dark|system once).
 const themeScript =

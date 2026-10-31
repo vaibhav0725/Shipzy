@@ -46,12 +46,11 @@ export function Icon({ name, size }: { name: IconName; size?: number }) {
   );
 }
 
-/** The brand mark: a rounded square with a rising triangle (a deploy going up). */
+/** The brand mark: an ember square with a rising triangle (a deploy going up). */
 export function Logo() {
   return (
-    <svg viewBox="0 0 28 28" aria-hidden="true">
-      <rect width="28" height="28" rx="8" fill="var(--accent)" />
-      <path d="M14 7.5 20.500 19h-13L14 7.5Z" fill="var(--accent-text)" />
-    </svg>
+    <span className="mark" aria-hidden="true">
+      <svg viewBox="0 0 28 28"><path d="M14 5.5 22.5 21h-17Z" /></svg>
+    </span>
   );
 }

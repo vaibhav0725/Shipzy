@@ -8,13 +8,11 @@ export default function InstallCommand({ command }: { command: string }) {
   const [done, setDone] = useState(false);
   return (
     <div className="install">
-      <code>
-        <span className="prompt">$ </span>
-        {command}
-      </code>
+      <span className="prompt">$</span>
+      <code>{command}</code>
       <button
         type="button"
-        className="btn small ghost"
+        aria-label="Copy the install command"
         onClick={() => {
           void navigator.clipboard?.writeText(command).then(() => {
             setDone(true);
@@ -23,7 +21,7 @@ export default function InstallCommand({ command }: { command: string }) {
         }}
       >
         <Icon name={done ? 'check' : 'copy'} />
-        {done ? 'Copied' : 'Copy'}
+        {done && 'Copied'}
       </button>
     </div>
   );

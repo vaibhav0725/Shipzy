@@ -8,7 +8,7 @@ export default function CodeCopy() {
     const onClick = (e: MouseEvent) => {
       const button = (e.target as HTMLElement).closest<HTMLButtonElement>('.code .copy');
       if (!button) return;
-      const text = button.parentElement?.querySelector('pre')?.textContent ?? '';
+      const text = button.closest('.code')?.querySelector('pre')?.textContent ?? '';
       void navigator.clipboard?.writeText(text.replace(/\n$/, '')).then(() => {
         const label = button.textContent;
         button.textContent = 'Copied';

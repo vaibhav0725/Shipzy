@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Callout from '@/components/Callout';
 import Diagram from '@/components/Diagram';
 
 export const metadata: Metadata = { title: 'How it works', description: 'What shipzy creates in your AWS account, what happens when you deploy, and how a visitor’s request is served.' };
@@ -71,9 +72,9 @@ export default function HowItWorks() {
           <h2 id="not-yet">What it does not do yet</h2>
           <p>shipzy serves files. Server-rendered Next.js, API routes and long-running servers are not supported yet. They are on the roadmap, and the routing design already leaves room for them. See <Link href="/docs/limits">limits and roadmap</Link>.</p>
 
-          <div className="callout" style={{ marginTop: 32 }}>
+          <Callout>
             <strong>Want the details?</strong> The <Link href="/docs/getting-started">documentation</Link> covers every command, and the <Link href="/security">security page</Link> explains what each part is allowed to do.
-          </div>
+          </Callout>
         </div>
       </div>
     </>

@@ -29,9 +29,12 @@ export interface DocMeta {
   order: number;
 }
 export interface TocItem { id: string; text: string; level: 2 | 3 }
-export interface Doc extends DocMeta { html: string; toc: TocItem[] }
+export interface Doc extends DocMeta { html: string; toc: TocItem[]; minutes: number }
 
 const DIR = path.join(process.cwd(), 'content', 'docs');
+
+const SHIELD =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.2 7.8 8 9 4.8-1.2 8-4.5 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg>';
 
 const marked = new Marked(
   markedHighlight({
@@ -86,6 +89,9 @@ export function getDoc(slug: string): Doc {
   const seen = new Map<string, number>();
   html = html.replace(/<h([23])>([\s\S]*?)<\/h\1>/g, (_all, level: string, inner: string) => {
     const text = stripTags(inner);
+    // "1. Install the CLI" shows its number in the margin style of the design.
+    const numbered = /^(\d+)\.\s+([\s\S]*)$/.exec(inner);
+    if (numbered) inner = `<span class="num">${numbered[1]}</span>${numbered[2]}`;
     const base = slugify(text) || 'section';
     const n = seen.get(base) ?? 0;
     seen.set(base, n + 1);
@@ -95,7 +101,11 @@ export function getDoc(slug: string): Doc {
   });
 
   // Code blocks get a copy button; tables scroll sideways instead of widening the page.
-  html = html.replace(/<pre>([\s\S]*?)<\/pre>/g, '<div class="code"><button class="copy" type="button">Copy</button><pre>$1</pre></div>');
+  html = html.replace(/<pre>(<code(?: class="hljs language-([a-z0-9]+)")?>[\s\S]*?<\/code>)<\/pre>/g, (_m, code: string, lang?: string) =>
+    `<div class="code"><div class="bar"><span>${lang ?? 'text'}</span><button class="copy" type="button">copy</button></div><pre>${code}</pre></div>`,
+  );
+  // A note: an icon beside its text.
+  html = html.replace(/<blockquote>([\s\S]*?)<\/blockquote>/g, `<blockquote>${SHIELD}<div>$1</div></blockquote>`);
   html = html.replace(/<table>/g, '<div class="table-wrap"><table>').replace(/<\/table>/g, '</table></div>');
 
   // ![caption](shot:overview) becomes a screenshot with a light and a dark version.
@@ -103,5 +113,6 @@ export function getDoc(slug: string): Doc {
     `<figure class="shot"><a class="light" href="/shots/${name}-light.png" target="_blank" rel="noopener"><img src="/shots/${name}-light.png" alt="${alt}" width="1360" height="860" loading="lazy"></a><a class="dark" href="/shots/${name}-dark.png" target="_blank" rel="noopener"><img src="/shots/${name}-dark.png" alt="${alt}" width="1360" height="860" loading="lazy"></a><figcaption>${alt} <span style="opacity:.7">(click to enlarge)</span></figcaption></figure>`,
   );
 
-  return { ...meta, html, toc };
+  const minutes = Math.max(1, Math.round(body.split(/\s+/).length / 220));
+  return { ...meta, html, toc, minutes };
 }

@@ -55,35 +55,42 @@ function ThemeSwitch() {
 export default function Nav() {
   const path = usePathname();
   const { data } = useApi<Status>('/api/status');
+  const projects = useApi<unknown[]>('/api/projects', { interval: 30000 });
   const active = (href: string) =>
     href === '/' ? path === '/' : href === '/projects' ? path === '/projects' || (path.startsWith('/projects/') && path !== '/projects/new') : path.startsWith(href);
   return (
     <aside className="side">
       <Link href="/" className="brand">
         <Logo />
-        shipzy
+        <span className="name">shipzy</span>
+        <span className="tag">local</span>
       </Link>
+      <div className="acct">
+        <div className="top">
+          <span className="label">AWS account</span>
+          {data?.demo && <span className="tagline">demo data</span>}
+        </div>
+        <span className="num">{data ? data.account : '…'}</span>
+        <span className="sub">{data ? `${data.region ?? '-'} · ${data.stack.name}` : 'connecting'}</span>
+      </div>
       <nav className="nav" aria-label="Main">
+        <span className="label">Workspace</span>
         {links.map((l) => (
           <Link key={l.href} href={l.href} className={active(l.href) ? 'active' : ''} aria-current={active(l.href) ? 'page' : undefined}>
             <Icon name={l.icon} />
             {l.label}
+            {l.href === '/projects' && projects.data && <span className="count">{projects.data.length}</span>}
           </Link>
         ))}
       </nav>
-      <ThemeSwitch />
-      <div className="acct">
-        {data ? (
-          <>
-            {data.demo && <span className="badge warn" style={{ justifySelf: 'start', marginBottom: 4 }}>Demo data</span>}
-            <strong>AWS {data.account}</strong>
-            <span>
-              {data.region} · stack {data.stack.name}
-            </span>
-          </>
-        ) : (
-          <span>Local dashboard</span>
+      <div className="foot">
+        {data && (
+          <div className="stackline">
+            <i />
+            stack · {data.stack.status.toLowerCase().replace(/_/g, ' ')}
+          </div>
         )}
+        <ThemeSwitch />
       </div>
     </aside>
   );

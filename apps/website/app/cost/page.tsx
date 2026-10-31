@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Callout from '@/components/Callout';
 
 export const metadata: Metadata = { title: 'Cost', description: 'What shipzy costs to run on AWS, with the arithmetic, and the situations where it is not the cheapest choice.' };
 
@@ -13,7 +14,7 @@ export default function Cost() {
 
       <div className="container narrow page-body">
         <div className="prose">
-          <div className="callout warn"><strong>These are estimates.</strong> They use AWS list prices as we understand them at the time of writing, for the US East region. Prices and free allowances change, so check the AWS pricing pages before you rely on a number.</div>
+          <Callout warn><strong>These are estimates.</strong> They use AWS list prices as we understand them at the time of writing, for the US East region. Prices and free allowances change, so check the AWS pricing pages before you rely on a number.</Callout>
 
           <h2 id="what">What you pay for</h2>
           <div className="table-wrap">

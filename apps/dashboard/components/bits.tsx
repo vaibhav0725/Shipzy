@@ -15,7 +15,7 @@ export function Badge({ kind, children, dot, pulse }: { kind?: 'ok' | 'bad' | 'w
 export function StatusBadge({ status }: { status?: string }) {
   if (!status) return <Badge>-</Badge>;
   const s = status.toUpperCase();
-  const kind = ['SUCCEEDED', 'ISSUED', 'OK', 'CREATE_COMPLETE', 'UPDATE_COMPLETE', 'UPDATE_ROLLBACK_COMPLETE'].includes(s)
+  const kind = ['SUCCEEDED', 'ISSUED', 'OK', 'LIVE', 'CREATE_COMPLETE', 'UPDATE_COMPLETE', 'UPDATE_ROLLBACK_COMPLETE'].includes(s)
     ? 'ok'
     : ['FAILED', 'FAULT', 'TIMED_OUT', 'STOPPED', 'CANCELLED', 'ROLLBACK_COMPLETE'].some((x) => s.includes(x)) || s.endsWith('_FAILED')
       ? 'bad'
@@ -29,12 +29,10 @@ export function StatusBadge({ status }: { status?: string }) {
   );
 }
 
-/** A coloured square with the project's first letter; the colour is derived from the name so it stays the same. */
+/** The project's first letter in a small tile. */
 export function Avatar({ name, large }: { name: string; large?: boolean }) {
-  let hash = 0;
-  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) % 360;
   return (
-    <span className={`avatar ${large ? 'lg' : ''}`} style={{ ['--h' as string]: hash }} aria-hidden="true">
+    <span className={`avatar ${large ? 'lg' : ''}`} aria-hidden="true">
       {name.charAt(0)}
     </span>
   );

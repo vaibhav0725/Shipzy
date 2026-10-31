@@ -60,26 +60,17 @@ export default function ProjectPage() {
 
   return (
     <>
-      <div className="crumbs">
-        <Link href="/projects">Projects</Link>
-        <span>/</span>
-        <span>{name}</span>
-      </div>
-      <div className="head">
-        <div className="row" style={{ gap: 14, flexWrap: 'nowrap' }}>
+      <div className="head" style={{ alignItems: 'flex-start' }}>
+        <div className="row" style={{ gap: '1rem', flexWrap: 'nowrap', minWidth: 0 }}>
           <Avatar name={name} large />
-          <div>
+          <div style={{ minWidth: 0 }}>
             <h1>{name}</h1>
-            <div className="row" style={{ marginTop: 6 }}>
-              {m ? (
-                <Badge kind={liveHosts.length ? 'ok' : undefined} dot>
-                  {liveHosts.length ? 'Live' : 'Offline'}
-                </Badge>
-              ) : null}
-              {frameworkLabel(latest?.framework) && <Badge>{frameworkLabel(latest?.framework)}</Badge>}
+            <div className="row" style={{ marginTop: '0.5rem', gap: '0.75rem' }}>
+              {m ? <StatusBadge status={liveHosts.length ? 'live' : 'offline'} /> : null}
+              {frameworkLabel(latest?.framework) && <span className="badge tag">{frameworkLabel(latest?.framework)?.toLowerCase().replace(' (static export)', ' · static export')}</span>}
               {m?.source && (
-                <a className="small muted row" style={{ gap: 5 }} href={`https://github.com/${m.source.repo}`} target="_blank" rel="noreferrer">
-                  <Icon name="github" size={14} />
+                <a className="mono muted row" style={{ gap: '0.375rem', fontSize: '0.75rem' }} href={`https://github.com/${m.source.repo}`} target="_blank" rel="noreferrer">
+                  <Icon name="branch" size={13} />
                   {m.source.repo} · {m.source.branch}
                 </a>
               )}
@@ -87,20 +78,20 @@ export default function ProjectPage() {
           </div>
         </div>
         <div className="row">
+          <button className="danger" style={{ borderColor: 'transparent', background: 'none' }} onClick={() => setDeleting(true)}>
+            <Icon name="trash" />
+            Delete
+          </button>
+          <Link className="btn" href={`/projects/new?project=${name}`}>
+            <Icon name="rocket" />
+            Deploy new version
+          </Link>
           {primary && (
             <a className="btn primary" href={siteUrl(primary)} target="_blank" rel="noreferrer">
               <Icon name="external" />
               Visit
             </a>
           )}
-          <Link className="btn" href={`/projects/new?project=${name}`}>
-            <Icon name="rocket" />
-            Deploy new version
-          </Link>
-          <button className="danger" onClick={() => setDeleting(true)}>
-            <Icon name="trash" />
-            Delete
-          </button>
         </div>
       </div>
 
@@ -114,7 +105,7 @@ export default function ProjectPage() {
               <div className="v muted">Not live</div>
             ) : (
               liveHosts.slice(0, 2).map((h) => (
-                <div className="v row" key={h} style={{ flexWrap: 'nowrap', gap: 2 }}>
+                <div className="v mono row" key={h} style={{ flexWrap: 'nowrap', gap: 2 }}>
                   <a href={siteUrl(h)} target="_blank" rel="noreferrer" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{h}</a>
                   <CopyButton text={siteUrl(h)} />
                 </div>
@@ -123,7 +114,7 @@ export default function ProjectPage() {
           </div>
           <div>
             <div className="l">Source</div>
-            <div className="v">{m.source ? <>Pushes to <span className="mono">{m.source.branch}</span></> : <span className="muted">Manual deploys</span>}</div>
+            <div className="v">{m.source ? <>Pushes to <span className="mono" style={{ fontSize: '0.78rem' }}>{m.source.branch}</span></> : <span className="muted">Manual deploys</span>}</div>
           </div>
           <div>
             <div className="l">Last deployed</div>
@@ -131,7 +122,7 @@ export default function ProjectPage() {
           </div>
           <div>
             <div className="l">Versions</div>
-            <div className="v">{m.deployments.filter((d) => d.preview === undefined).length}</div>
+            <div className="v mono">{m.deployments.filter((d) => d.preview === undefined).length} <span className="faint" style={{ fontSize: '0.75rem' }}>kept</span></div>
           </div>
         </div>
       )}
@@ -187,11 +178,11 @@ function Deployments({ name, manifest, run }: { name: string; manifest?: Manifes
           <thead><tr><th>Deployment</th><th>Created</th><th>Files</th><th>Live on</th><th /></tr></thead>
           <tbody>
             {rows.map((d) => (
-              <tr key={d.id}>
-                <td className="mono">{d.id}{d.preview !== undefined && <> <Badge>preview #{d.preview}</Badge></>}</td>
-                <td>{timeAgo(d.createdAt)}</td>
-                <td>{d.files}</td>
-                <td>{(liveOf.get(d.id) ?? []).map((h) => <div key={h}><Badge kind="ok">live</Badge> {h}</div>)}</td>
+              <tr key={d.id} className={liveOf.has(d.id) ? 'live' : undefined}>
+                <td><span className="depid"><i />{d.id}{d.preview !== undefined && <Badge>preview #{d.preview}</Badge>}</span></td>
+                <td className="muted">{timeAgo(d.createdAt)}</td>
+                <td className="mono muted">{d.files}</td>
+                <td className="mono" style={{ fontSize: '0.78rem' }}>{(liveOf.get(d.id) ?? []).map((h) => <div key={h}><span className="livetag">live</span>{h}</div>)}</td>
                 <td className="actions">{!liveOf.has(d.id) && <button className="small" onClick={() => setRollback(d.id)}>Serve this one</button>}</td>
               </tr>
             ))}

@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { Toc } from '@/components/DocsNav';
 import { allDocs, getDoc } from '@/lib/docs';
+import { site } from '@/lib/site';
 
 export const dynamicParams = false;
 
@@ -24,24 +26,30 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
   const prev = docs[index - 1];
   const next = docs[index + 1];
 
+  const editUrl = site.repoUrl ? `${site.repoUrl}/edit/main/apps/website/content/docs/${doc.slug}.md` : undefined;
+
   return (
     <div className="doc-grid">
-      <article>
-        <p className="faint" style={{ fontSize: 13.5, fontWeight: 650, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 10 }}>{doc.section}</p>
+      <article style={{ minWidth: 0 }}>
+        <span className="label">{doc.section}</span>
         <h1 className="doc-title">{doc.title}</h1>
         <p className="doc-desc">{doc.description}</p>
-        <div className="prose" style={{ marginTop: 28 }} dangerouslySetInnerHTML={{ __html: doc.html }} />
+        <div className="doc-meta">
+          <span>~{doc.minutes} min read</span>
+          {editUrl && (
+            <>
+              <span>·</span>
+              <a href={editUrl}>Edit on GitHub</a>
+            </>
+          )}
+        </div>
+        <div className="prose" style={{ marginTop: '1.75rem' }} dangerouslySetInnerHTML={{ __html: doc.html }} />
         <div className="pager">
-          {prev ? <Link href={`/docs/${prev.slug}`}><small>Previous</small>{prev.title}</Link> : <span />}
-          {next && <Link className="next" href={`/docs/${next.slug}`}><small>Next</small>{next.title}</Link>}
+          {prev ? <Link href={`/docs/${prev.slug}`}><small>← Previous</small>{prev.title}</Link> : <span />}
+          {next && <Link className="next" href={`/docs/${next.slug}`}><small>Next →</small>{next.title}</Link>}
         </div>
       </article>
-      <aside className="toc" aria-label="On this page">
-        <h4>On this page</h4>
-        {doc.toc.map((t) => (
-          <a key={t.id} href={`#${t.id}`} className={t.level === 3 ? 'l3' : undefined}>{t.text}</a>
-        ))}
-      </aside>
+      <Toc items={doc.toc} />
     </div>
   );
 }

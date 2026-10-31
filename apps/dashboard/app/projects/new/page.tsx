@@ -130,8 +130,18 @@ export default function NewDeployment() {
         ? `Connect ${repo.trim() || 'a repository'} and deploy on every push`
         : `Deploy ${repo.trim() || 'a repository'} once`;
 
+  // The command this form runs, shown beside it: the dashboard does exactly what you would type.
+  const arg = (value: string, fallback: string) => (value.trim() === '' ? fallback : value.trim());
+  const typed =
+    source === 'folder'
+      ? ['shipzy deploy', arg(dir, '<folder>'), `--project ${arg(project, '<name>')}`, ...(remote ? ['--remote'] : []), ...(host.trim() ? [`--host ${host.trim()}`] : [])]
+      : mode === 'auto'
+        ? [`shipzy github connect -p ${arg(project, '<name>')}`, `--repo ${arg(repo, '<owner/name>')}`, ...(branch.trim() ? [`--branch ${branch.trim()}`] : []), ...(host.trim() ? [`--host ${host.trim()}`] : [])]
+        : ['shipzy deploy', `--repo ${arg(repo, '<owner/name>')}`, `--project ${arg(project, '<name>')}`, ...(branch.trim() ? [`--branch ${branch.trim()}`] : []), ...(host.trim() ? [`--host ${host.trim()}`] : [])];
+
   return (
-    <div className="narrow">
+    <div className="newgrid">
+      <div>
       <div className="head">
         <div>
           <h1>New deployment</h1>
@@ -140,7 +150,7 @@ export default function NewDeployment() {
       </div>
 
       <form onSubmit={submit}>
-        <div className="step"><b>1</b><h2>Choose a source</h2></div>
+        <div className="step"><b>01</b><h2>Choose a source</h2></div>
         <div className="sources" role="tablist">
           <button type="button" role="tab" aria-selected={source === 'folder'} className={`source ${source === 'folder' ? 'on' : ''}`} onClick={() => setSource('folder')}>
             <span className="ic"><Icon name="folder" /></span>
@@ -158,7 +168,7 @@ export default function NewDeployment() {
           </button>
         </div>
 
-        <div className="card" style={{ marginTop: 14 }}>
+        <div className="formcard">
           {source === 'folder' ? (
             <>
               <label className="field">
@@ -175,13 +185,21 @@ export default function NewDeployment() {
                   </small>
                 )}
               </label>
-              <label className="field" style={{ marginBottom: 0 }}>
-                <span>Where to build</span>
-                <select value={remote ? 'aws' : 'local'} onChange={(e) => setRemote(e.target.value === 'aws')}>
-                  <option value="local">On this computer (fast; uses your local .env)</option>
-                  <option value="aws">In your AWS account (CodeBuild; uses the variables saved for the project)</option>
-                </select>
-              </label>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <span style={{ display: 'block', fontWeight: 600, fontSize: '0.84rem', marginBottom: '0.375rem' }}>Where to build</span>
+                <div className="seg" role="radiogroup" aria-label="Where to build">
+                  <label className={!remote ? 'on' : ''}>
+                    <input type="radio" name="where" checked={!remote} onChange={() => setRemote(false)} />
+                    <div className="t"><i />On this computer</div>
+                    <div className="d">Fast; uses your local .env</div>
+                  </label>
+                  <label className={remote ? 'on' : ''}>
+                    <input type="radio" name="where" checked={remote} onChange={() => setRemote(true)} />
+                    <div className="t"><i />In your AWS account</div>
+                    <div className="d">CodeBuild; uses saved variables</div>
+                  </label>
+                </div>
+              </div>
             </>
           ) : (
             <>
@@ -254,8 +272,8 @@ export default function NewDeployment() {
           )}
         </div>
 
-        <div className="step" style={{ marginTop: 26 }}><b>2</b><h2>Name and address</h2></div>
-        <div className="card">
+        <div className="step" style={{ marginTop: '1.75rem' }}><b>02</b><h2>Name and address</h2></div>
+        <div className="formcard">
           <label className="field">
             <span>Project name</span>
             <input type="text" value={project} onChange={(e) => setProject(e.target.value.toLowerCase())} placeholder="my-app" spellCheck={false} required />
@@ -291,7 +309,7 @@ export default function NewDeployment() {
 
         <ErrorNotice message={error} />
         <div className="actionbar">
-          <button className="primary" disabled={busy || !NAME_RE.test(project)}>
+          <button className="primary lg" disabled={busy || !NAME_RE.test(project)}>
             <Icon name="rocket" />
             {busy ? 'Starting...' : source === 'github' && mode === 'auto' ? 'Connect and deploy' : 'Deploy'}
           </button>
@@ -300,6 +318,13 @@ export default function NewDeployment() {
       </form>
 
       {picking && <FolderPicker start={dir.startsWith('/') ? dir : undefined} onClose={() => setPicking(false)} onPick={(p) => { setDir(p); setPicking(false); }} />}
+      </div>
+
+      <aside className="runcli" aria-label="The command this runs">
+        <div className="t label">Runs the CLI</div>
+        <pre><b>$</b> {typed.join(' \\\n    ')}</pre>
+        <p>The dashboard runs exactly what you would type. You can follow the log live on the next screen.</p>
+      </aside>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Callout from '@/components/Callout';
 
 export const metadata: Metadata = { title: 'Security', description: 'Where shipzy runs, what it is allowed to do in your AWS account, how secrets are handled, and the limits we want you to know about.' };
 
@@ -13,7 +14,7 @@ export default function Security() {
 
       <div className="container narrow page-body">
         <div className="prose">
-          <div className="callout"><strong>The short version.</strong> shipzy runs on your machine and in your AWS account. We operate no servers, no accounts and no database, so there is no shipzy backend that could be breached to reach your sites, your code or your keys.</div>
+          <Callout><strong>The short version.</strong> shipzy runs on your machine and in your AWS account. We operate no servers, no accounts and no database, so there is no shipzy backend that could be breached to reach your sites, your code or your keys.</Callout>
 
           <h2 id="where">What runs where</h2>
           <div className="table-wrap">
@@ -72,7 +73,7 @@ export default function Security() {
           </ul>
 
           <h2 id="limits">Honest limits</h2>
-          <div className="callout warn"><strong>Early preview.</strong> shipzy has not had an independent security audit. Read the code (it is open source), and start with a throwaway AWS account if you are cautious.</div>
+          <Callout warn><strong>Early preview.</strong> shipzy has not had an independent security audit. Read the code (it is open source), and start with a throwaway AWS account if you are cautious.</Callout>
           <ul>
             <li><strong>Builds run your code.</strong> CodeBuild executes your project’s install and build scripts in your account, with the build role’s permissions. Only build code you trust.</li>
             <li><strong>The CLI policy can create roles named for the stack.</strong> Someone holding that key could attach extra rights to such a role. Treat the key as sensitive, do not share it, and prefer a short-lived profile where you can.</li>
