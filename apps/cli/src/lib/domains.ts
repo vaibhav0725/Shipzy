@@ -108,6 +108,32 @@ export async function checkDns(host: string, distributionDomain: string): Promis
   }
 }
 
+export type RecordState = { state: 'ok' } | { state: 'extended'; seenAt: string; extra: string } | { state: 'missing' };
+
+/**
+ * Is this CNAME visible in public DNS? A common mistake is pasting the full name into a provider that adds your
+ * domain itself (GoDaddy, Namecheap...), which stores it twice (`x.shipzy.example.com.example.com`). That is
+ * detected too, so the person can be told exactly what to change.
+ */
+export async function diagnoseRecord(name: string, value: string): Promise<RecordState> {
+  const clean = name.replace(/\.$/, '').toLowerCase();
+  const want = value.replace(/\.$/, '').toLowerCase();
+  const points = async (host: string) => {
+    try {
+      return (await resolver.resolveCname(host)).some((c) => c.replace(/\.$/, '').toLowerCase() === want);
+    } catch {
+      return false;
+    }
+  };
+  if (await points(clean)) return { state: 'ok' };
+  const labels = clean.split('.');
+  for (let i = 1; i < labels.length - 1; i++) {
+    const extra = labels.slice(i).join('.');
+    if (await points(`${clean}.${extra}`)) return { state: 'extended', seenAt: `${clean}.${extra}`, extra };
+  }
+  return { state: 'missing' };
+}
+
 /** Every claimed domain with the project that owns it (one read of each history file, all at once). */
 export async function domainOwners(bucket: string): Promise<Map<string, string>> {
   const projects = await listManifestProjects(bucket);

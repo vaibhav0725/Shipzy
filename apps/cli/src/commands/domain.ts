@@ -1,4 +1,4 @@
-import { colorStatus, ui } from '../lib/ui.js';
+import { colorStatus, ui, uiErr } from '../lib/ui.js';
 import * as fs from 'node:fs';
 import {
   assertProjectName,
@@ -22,6 +22,7 @@ import { getOutputs, GlobalOptions } from '../lib/aws.js';
 import { deployStack } from '../lib/cfn.js';
 import {
   checkDns,
+  diagnoseRecord,
   domainOwners,
   domainStackName,
   listDomainStacks,
@@ -36,8 +37,21 @@ import { isPreviewHost } from '@deployer/core';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** The name without the main domain, as providers that add the domain themselves want it (assumes a two-label domain). */
+function relativeName(name: string): string | undefined {
+  const labels = name.replace(/\.$/, '').split('.');
+  return labels.length > 3 ? labels.slice(0, -2).join('.') : undefined;
+}
+
 function printRecord(intro: string, rec: { type: string; name: string; value: string }): void {
-  console.log(`\n${ui.bold(intro)}\n  ${ui.dim('Type ')}  ${rec.type}\n  ${ui.dim('Name ')}  ${ui.accent(rec.name)}\n  ${ui.dim('Value')}  ${ui.accent(rec.value)}\n`);
+  console.log(`\n${ui.bold(intro)}\n  ${ui.dim('Type ')}  ${rec.type}\n  ${ui.dim('Name ')}  ${ui.accent(rec.name)}\n  ${ui.dim('Value')}  ${ui.accent(rec.value)}`);
+  const short = relativeName(rec.name);
+  if (short) {
+    console.log(
+      ui.dim(`\n  Providers like GoDaddy and Namecheap add your main domain to the Name themselves. If yours does, enter only:\n  ${short}\n  (that assumes your main domain is ${rec.name.replace(/\.$/, '').split('.').slice(-2).join('.')}).`),
+    );
+  }
+  console.log('');
 }
 
 /** A failed destroy may already have deleted the stack's storage; recovery commands carry on without it. */
@@ -107,8 +121,30 @@ export async function domainAdd(hostArg: string, opts: DomainAddOptions, global:
       if (opts.wait === false) return console.log('Run the same command again once the record is in place.');
     }
     console.log(ui.step('Waiting for the certificate (usually 1 to 10 minutes)...'));
+    let told = '';
+    let checking = false;
     const issued = await waitUntilIssued(certArn, 30 * 60_000, (secs) => {
-      if (secs > 0 && secs % 60 < 15) console.log(ui.dim(`  still waiting (${Math.round(secs / 60)} min)`));
+      if (!(secs > 0 && secs % 60 < 15)) return;
+      console.log(ui.dim(`  still waiting (${Math.round(secs / 60)} min)`));
+      // After a minute, look at public DNS: a record that is missing or stored under the wrong name is the usual cause.
+      if (zone || secs < 60 || checking) return;
+      checking = true;
+      void diagnoseRecord(rec.name, rec.value)
+        .then((d) => {
+          if (d.state === 'extended' && told !== 'extended') {
+            told = 'extended';
+            console.warn(
+              uiErr.yellow(
+                `\n  The record exists, but at ${d.seenAt}: your DNS provider added "${d.extra}" to the name.\n` +
+                  `  Edit the record so its Name is only: ${rec.name.replace(/\.$/, '').slice(0, rec.name.replace(/\.$/, '').length - d.extra.length - 1) }\n  The Value stays the same. This will continue by itself once it is fixed.\n`,
+              ),
+            );
+          } else if (d.state === 'missing' && told === '' && secs >= 120) {
+            told = 'missing';
+            console.warn(uiErr.yellow(`\n  The validation record is not visible in public DNS yet. Check that you added it exactly as printed above (DNS can take a few minutes to appear).\n`));
+          }
+        })
+        .finally(() => (checking = false));
     });
     if (!issued) return console.log('The certificate is not issued yet. Run the same command again to continue.');
   }

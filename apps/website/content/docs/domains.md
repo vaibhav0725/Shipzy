@@ -46,6 +46,7 @@ If you would rather not delegate, use `--manual` and add the two printed records
 - A hostname can belong to **one CloudFront distribution in the world**. If it already belongs to another (an old site, for example), `domain add` stops and says so. Remove it from that distribution first.
 - Each domain is one distribution and one certificate. Certificates are free, and an idle distribution costs nothing.
 - Route 53 charges about $0.50 a month per hosted zone.
+- **Enter the Name without your main domain.** Providers such as GoDaddy and Namecheap add your domain themselves. For `shipzy.example.com`, a record named `_abc123.shipzy.example.com` must be entered as `_abc123.shipzy`, and the alias as `shipzy`. If it is entered in full, the domain is added twice and the certificate never validates. `domain add` checks public DNS after a minute and tells you if it finds the record under the doubled name.
 - `--no-wait` returns instead of waiting for the certificate and DNS. Rerun the same command later to continue.
 
 ## Wildcard preview domain

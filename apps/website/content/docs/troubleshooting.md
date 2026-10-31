@@ -19,6 +19,7 @@ order: 2
 | `Could not fetch <repo> at <sha>` in a build log | The repository does not exist or the stored token cannot read it. Store a new token with `github connect`. |
 | `domain add` says the hostname is already used by another CloudFront distribution | A hostname can belong to one distribution only. Remove it from the other distribution first, then rerun. |
 | `domain add` waits for the certificate for a long time | The validation CNAME is not visible. With Route 53, check the zone is delegated (`dig NS <zone> @8.8.8.8`). With manual DNS, check you added the record exactly as printed. |
+| `domain add` reports the record exists "but at …" with your domain repeated | Your DNS provider added your main domain to the Name you typed. Edit the record and enter only the part before your main domain (for example `_abc123.shipzy`, not `_abc123.shipzy.example.com`). |
 | `domain verify` says DNS does not reach the distribution | The hostname's CNAME or alias is missing or still propagating. Compare with the record `domain add` printed. |
 | Visitors get a plain-text "No deployment is live for …" | The hostname has no route. Deploy to it, or roll back to a recorded deploy. |
 | A site still shows the old version | Routing changes take about 30 seconds to reach every location. |
