@@ -2,6 +2,7 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { childEnv, cliCommand, clearCache } from './cli';
 import { settings } from './config';
+import { demoEnabled, demoScript } from './demo';
 
 export type JobStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
 
@@ -85,9 +86,20 @@ const info = (j: Job): JobInfo => ({
   exitCode: j.exitCode,
 });
 
+// Demo mode: play back a scripted log instead of running anything.
+async function playDemo(job: Job, step: Step): Promise<number | null> {
+  for (const [delay, line] of demoScript(step.args)) {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    if (job.status === 'cancelled') return null;
+    append(job, line);
+  }
+  return 0;
+}
+
 function runStep(job: Job, step: Step): Promise<number | null> {
   const { file, argv } = cliCommand(step.args);
   append(job, `$ shipzy ${step.args.join(' ')}`);
+  if (demoEnabled()) return playDemo(job, step);
   return new Promise((resolve) => {
     const child = spawn(file, argv, {
       stdio: [step.stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],

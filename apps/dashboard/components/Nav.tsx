@@ -75,6 +75,7 @@ export default function Nav() {
       <div className="acct">
         {data ? (
           <>
+            {data.demo && <span className="badge warn" style={{ justifySelf: 'start', marginBottom: 4 }}>Demo data</span>}
             <strong>AWS {data.account}</strong>
             <span>
               {data.region} · stack {data.stack.name}

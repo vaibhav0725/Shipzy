@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { settings } from './config';
+import { demoEnabled, demoRead } from './demo';
 
 /** Options every CLI call gets, so the dashboard acts on the same profile, region and stack it was started with. */
 export function globalArgs(): string[] {
@@ -64,6 +65,10 @@ export function warm(): void {
 }
 
 function run(args: string[]): Promise<string> {
+  if (demoEnabled()) {
+    const value = demoRead(args);
+    return value === undefined ? Promise.reject(new CliError('Not available in demo mode.')) : Promise.resolve(JSON.stringify(value));
+  }
   const { file, argv } = cliCommand(args);
   return new Promise((resolve, reject) => {
     const child = spawn(file, argv, { stdio: ['ignore', 'pipe', 'pipe'], env: childEnv() });

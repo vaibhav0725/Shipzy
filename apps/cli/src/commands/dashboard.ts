@@ -13,6 +13,8 @@ export interface DashboardOptions {
   open: boolean;
   /** download (or update) the optional dashboard package first, without asking */
   install?: boolean;
+  /** run on sample data: nothing is read from or changed in AWS */
+  demo?: boolean;
 }
 
 function canListen(port: number): Promise<boolean> {
@@ -74,6 +76,7 @@ export async function dashboard(opts: DashboardOptions, global: GlobalOptions): 
       HOSTNAME: '127.0.0.1',
       PORT: String(port),
       DEPLOYER_DASH_TOKEN: token,
+      ...(opts.demo ? { SHIPZY_DEMO: '1' } : {}),
       DEPLOYER_CLI: cli,
       DEPLOYER_CWD: process.cwd(),
       DEPLOYER_GLOBALS: JSON.stringify({ profile: global.profile, region: process.env.AWS_REGION, stackName: global.stackName }),
@@ -101,7 +104,11 @@ export async function dashboard(opts: DashboardOptions, global: GlobalOptions): 
   });
 
   const url = `http://127.0.0.1:${port}/?token=${token}`;
-  console.log(ui.ok(`${ui.bold('Dashboard running')} for stack ${ui.name(`"${global.stackName}"`)} (${process.env.AWS_REGION}).`));
+  console.log(
+    opts.demo
+      ? ui.ok(`${ui.bold('Dashboard running in demo mode')} ${ui.dim('(sample data; nothing is read from or changed in AWS)')}`)
+      : ui.ok(`${ui.bold('Dashboard running')} for stack ${ui.name(`"${global.stackName}"`)} (${process.env.AWS_REGION}).`),
+  );
   console.log(`\n  ${ui.url(url)}\n`);
   console.log(ui.dim('Open that address (it signs your browser in; the link is only good for this run). Press Ctrl-C to stop.'));
   console.log(ui.dim('Actions you start here run on this computer, using your AWS profile, exactly like the CLI.'));

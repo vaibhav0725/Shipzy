@@ -18,3 +18,6 @@ apps/dashboard/.next/
 apps/dashboard/dist-package/
 apps/dashboard/next-env.d.ts
 apps/dashboard/*.tsbuildinfo
+apps/website/.next/
+apps/website/out/
+apps/website/next-env.d.ts

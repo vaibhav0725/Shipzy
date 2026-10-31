@@ -52,6 +52,7 @@ program
   .option('--port <number>', 'port to listen on (127.0.0.1 only)', '4173')
   .option('--no-open', 'do not open the browser')
   .option('--install', 'download or update the dashboard (an optional extra) before starting it')
+  .option('--demo', 'run on sample data, without reading or changing anything in AWS')
   .action((opts) => dashboard(opts, globals()));
 
 program.command('init').description('Create or update the AWS stack').action(() => init(globals()));

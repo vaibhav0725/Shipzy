@@ -27,6 +27,8 @@ export interface Manifest {
   previews?: Record<string, unknown>;
 }
 export interface Status {
+  /** true when the dashboard runs on sample data (`shipzy dashboard --demo`) */
+  demo?: boolean;
   account: string;
   identity: string;
   region?: string;
