@@ -758,6 +758,15 @@ settings keep S3 storage bounded.
 you will pass it. AWS has no spending cap, so both only warn. Existing least-privilege users pick up the extra permissions
 (`cloudwatch:GetMetricData`, a budget named `Deployer*`) by re-running `docs/iam/create-limited-user.sh` with an admin profile.
 
+### The dashboard in your own AWS account
+
+`shipzy dashboard --deploy --allow <github-user>[,...]` runs the same dashboard in your own account as a stack named
+`<stack>-dashboard`: a web Lambda behind a Function URL (GitHub sign-in, only the listed usernames) and a worker Lambda
+that runs jobs in the background, with logs in a private S3 bucket for 14 days. `--configure` stores the GitHub OAuth
+App's id and secret in Secrets Manager; `--remove` deletes it. Its roles are narrower than the CLI user's policy (no IAM,
+no main-stack changes, no decryption of variable values). It cannot deploy local folders or take pasted tokens. It has no
+rate limiting and has had no independent security review. The website's "Dashboard in your AWS account" page is the full guide.
+
 ---
 
 ## 9. Security model

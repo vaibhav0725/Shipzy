@@ -20,6 +20,7 @@ import { pruneCommand } from './commands/prune.js';
 import { repoDeploy } from './commands/repo-deploy.js';
 import { rollback } from './commands/rollback.js';
 import { cost } from './commands/cost.js';
+import { dashboardHost } from './commands/dashboard-host.js';
 import { status } from './commands/status.js';
 import { DEFAULT_GRACE_MINUTES, DEFAULT_KEEP } from '@shipzy/core';
 
@@ -54,7 +55,11 @@ program
   .option('--no-open', 'do not open the browser')
   .option('--install', 'download or update the dashboard (an optional extra) before starting it')
   .option('--demo', 'run on sample data, without reading or changing anything in AWS')
-  .action((opts) => dashboard(opts, globals()));
+  .option('--deploy', 'run the dashboard in your own AWS account, behind a GitHub sign-in (instead of on this computer)')
+  .option('--allow <users>', 'with --deploy: the GitHub usernames allowed to sign in, comma-separated')
+  .option('--configure', 'with a deployed dashboard: set the GitHub OAuth App it signs in with')
+  .option('--remove', 'remove the dashboard from your AWS account')
+  .action((opts) => (opts.deploy || opts.configure || opts.remove ? dashboardHost(opts, globals()) : dashboard(opts, globals())));
 
 program
   .command('init')

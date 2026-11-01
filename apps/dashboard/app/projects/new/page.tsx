@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import FolderPicker, { FolderListing } from '@/components/FolderPicker';
 import GithubConnect, { RepoRow } from '@/components/GithubConnect';
+import { useMode } from '@/lib/client';
 import { ErrorNotice } from '@/components/bits';
 import { Icon } from '@/components/Icons';
 import { api, Manifest, startAction } from '@/lib/client';
@@ -21,6 +22,7 @@ function peek(input: string): { name?: string; branch?: string } {
 
 export default function NewDeployment() {
   const router = useRouter();
+  const hostedMode = useMode()?.hosted === true;
   const [source, setSource] = useState<Source>('folder');
   const [dir, setDir] = useState('');
   const [hint, setHint] = useState<FolderListing['project']>();
@@ -30,6 +32,13 @@ export default function NewDeployment() {
   const [branch, setBranch] = useState('');
   const [token, setToken] = useState('');
   const [reuse, setReuse] = useState(false);
+  // In a dashboard hosted in your own AWS account there is no local folder, and builds use the stored GitHub token.
+  useEffect(() => {
+    if (hostedMode) {
+      setSource('github');
+      setReuse(true);
+    }
+  }, [hostedMode]);
   const [loggedIn, setLoggedIn] = useState(false);
   const [picked, setPicked] = useState<RepoRow>();
   const [mode, setMode] = useState<'once' | 'auto'>('once');
@@ -152,13 +161,13 @@ export default function NewDeployment() {
       <form onSubmit={submit}>
         <div className="step"><b>01</b><h2>Choose a source</h2></div>
         <div className="sources" role="tablist">
-          <button type="button" role="tab" aria-selected={source === 'folder'} className={`source ${source === 'folder' ? 'on' : ''}`} onClick={() => setSource('folder')}>
+          {!hostedMode && <button type="button" role="tab" aria-selected={source === 'folder'} className={`source ${source === 'folder' ? 'on' : ''}`} onClick={() => setSource('folder')}>
             <span className="ic"><Icon name="folder" /></span>
             <span>
               <strong>Folder on this computer</strong>
               <span className="d">Build here or in AWS, then upload</span>
             </span>
-          </button>
+          </button>}
           <button type="button" role="tab" aria-selected={source === 'github'} className={`source ${source === 'github' ? 'on' : ''}`} onClick={() => setSource('github')}>
             <span className="ic"><Icon name="github" /></span>
             <span>
@@ -203,7 +212,7 @@ export default function NewDeployment() {
             </>
           ) : (
             <>
-              <GithubConnect selected={repo} onSession={onSession} onPick={pickRepo} />
+              {!hostedMode && <GithubConnect selected={repo} onSession={onSession} onPick={pickRepo} />}
               <label className="field">
                 <span>Repository link</span>
                 <input
@@ -240,10 +249,14 @@ export default function NewDeployment() {
                 </p>
               ) : (
                 <>
-                  <label className="check">
-                    <input type="checkbox" checked={reuse} onChange={(e) => setReuse(e.target.checked)} />
-                    <span>Use the GitHub token already stored in my AWS account</span>
-                  </label>
+                  {hostedMode ? (
+                    <p className="muted small">Builds use the GitHub token stored in your AWS account. Store it once from your machine with <code>shipzy github connect</code>.</p>
+                  ) : (
+                    <label className="check">
+                      <input type="checkbox" checked={reuse} onChange={(e) => setReuse(e.target.checked)} />
+                      <span>Use the GitHub token already stored in my AWS account</span>
+                    </label>
+                  )}
                   {useLogin && (
                     <p className="muted small">
                       Using your GitHub login. The token is stored encrypted in your own AWS account so builds can fetch the code, and is

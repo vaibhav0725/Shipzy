@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Icon, IconName, Logo } from '@/components/Icons';
-import { Status, useApi } from '@/lib/client';
+import { Status, useApi, useMode } from '@/lib/client';
 
 const links: { href: string; label: string; icon: IconName }[] = [
   { href: '/', label: 'Overview', icon: 'home' },
@@ -55,6 +55,7 @@ function ThemeSwitch() {
 export default function Nav() {
   const path = usePathname();
   const { data } = useApi<Status>('/api/status');
+  const mode = useMode();
   const projects = useApi<unknown[]>('/api/projects', { interval: 30000 });
   const active = (href: string) =>
     href === '/' ? path === '/' : href === '/projects' ? path === '/projects' || (path.startsWith('/projects/') && path !== '/projects/new') : path.startsWith(href);
@@ -63,7 +64,7 @@ export default function Nav() {
       <Link href="/" className="brand">
         <Logo />
         <span className="name">shipzy</span>
-        <span className="tag">local</span>
+        <span className="tag">{mode?.hosted ? 'hosted' : 'local'}</span>
       </Link>
       <div className="acct">
         <div className="top">

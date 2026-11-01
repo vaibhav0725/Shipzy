@@ -1,9 +1,11 @@
+import { hosted } from '@/lib/hosted';
 import { getJob, readLines, subscribe } from '@/lib/jobs';
 
 export const dynamic = 'force-dynamic';
 
 /** Server-sent events: `line` events carry batches of log lines, `end` carries the final status. */
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  if (hosted()) return new Response('Live streaming is not available here; the page polls instead.', { status: 404 });
   const { id } = await ctx.params;
   if (!getJob(id)) return new Response('No such job', { status: 404 });
   let cursor = Number(new URL(req.url).searchParams.get('from') ?? 0) || 0;

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/Icons';
-import { ProjectSummary, useApi } from '@/lib/client';
+import { ProjectSummary, useApi, useMode } from '@/lib/client';
 
 // Where the documentation lives. The dashboard itself is local; this is only a link.
 const DOCS_URL = 'https://shipzy.quantav.xyz/docs/getting-started';
@@ -95,6 +95,7 @@ export default function Topbar() {
   const path = usePathname() ?? '/';
   const crumbs = crumbsFor(path);
   const [open, setOpen] = useState(false);
+  const mode = useMode();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -128,6 +129,13 @@ export default function Topbar() {
         <span className="kbd">⌘K</span>
       </button>
       <a className="toplink" href={DOCS_URL} target="_blank" rel="noreferrer">Docs</a>
+      {mode?.hosted && mode.user && (
+        // A plain form post: the server clears the cookie and sends the browser back to the sign-in.
+        <form method="post" action="/auth/logout" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span className="toplink">{mode.user}</span>
+          <button type="submit" className="toplink" style={{ background: 'none', border: 0, cursor: 'pointer', padding: 0, font: 'inherit' }}>Sign out</button>
+        </form>
+      )}
       {open && <Palette onClose={() => setOpen(false)} />}
     </header>
   );

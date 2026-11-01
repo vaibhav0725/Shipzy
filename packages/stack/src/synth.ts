@@ -4,6 +4,7 @@ import * as cdk from 'aws-cdk-lib';
 import { ShipzyStack } from './shipzy-stack';
 import { DomainStack } from './domain-stack';
 import { SiteStack } from './site-stack';
+import { DashboardStack } from './dashboard-stack';
 
 // The stack has no file assets, so it needs no `cdk bootstrap`: we synthesize a
 // plain CloudFormation template that the CLI deploys directly.
@@ -47,3 +48,11 @@ const siteStack = new SiteStack(siteApp, 'DeployerSite', {
 });
 const siteTemplate = siteApp.synth().getStackByName(siteStack.stackName).template;
 fs.writeFileSync(path.resolve(path.dirname(out), 'site-template.json'), JSON.stringify(siteTemplate) + '\n');
+
+// The hosted dashboard (`shipzy dashboard --deploy`); the CLI fills in the parameters.
+const dashboardApp = new cdk.App({ analyticsReporting: false });
+const dashboardStack = new DashboardStack(dashboardApp, 'DeployerDashboard', {
+  synthesizer: new cdk.DefaultStackSynthesizer({ generateBootstrapVersionRule: false }),
+});
+const dashboardTemplate = dashboardApp.synth().getStackByName(dashboardStack.stackName).template;
+fs.writeFileSync(path.resolve(path.dirname(out), 'dashboard-template.json'), JSON.stringify(dashboardTemplate) + '\n');

@@ -105,6 +105,10 @@ Removes GitHub webhooks, custom domains and project addresses, empties both buck
 | `--port <number>` | Port to listen on (default 4173; `127.0.0.1` only) |
 | `--no-open` | Print the address without opening the browser |
 | `--install` | Download or update the optional dashboard first, without asking |
+| `--deploy` | Run the dashboard in your own AWS account instead, behind a GitHub sign-in ([guide](/docs/hosted-dashboard)) |
+| `--allow <users>` | With `--deploy`: the GitHub usernames allowed to sign in, comma-separated |
+| `--configure` | Set the GitHub OAuth App a deployed dashboard signs in with |
+| `--remove` | Remove the deployed dashboard from your AWS account |
 | `--demo` | Run on sample data, without reading or changing anything in AWS |
 
 ## `domain`

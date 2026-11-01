@@ -35,18 +35,64 @@ export default function JobLog({
 
   useEffect(() => {
     setLines([]);
-    const source = new EventSource(`/api/jobs/${jobId}/stream`);
-    source.addEventListener('lines', (e) => {
-      const { lines: chunk } = JSON.parse((e as MessageEvent).data) as { lines: string[] };
-      setLines((prev) => prev.concat(chunk));
-    });
-    source.addEventListener('end', (e) => {
-      source.close();
-      onEndRef.current?.(JSON.parse((e as MessageEvent).data) as End);
-    });
-    // On a dropped connection EventSource would reconnect and replay from the start; stop instead.
-    source.onerror = () => source.close();
-    return () => source.close();
+    let stopped = false;
+    let source: EventSource | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    // A hosted dashboard cannot hold a connection open for a long job, so it asks for new lines every moment.
+    const poll = async (from: number) => {
+      if (stopped) return;
+      let next = from;
+      let done = false;
+      try {
+        const res = await fetch(`/api/jobs/${jobId}?from=${from}`, { cache: 'no-store' });
+        if (res.ok) {
+          const body = (await res.json()) as { lines: string[]; next: number; status: string; exitCode?: number | null };
+          if (body.lines.length > 0) setLines((prev) => prev.concat(body.lines));
+          next = body.next;
+          if (body.status !== 'running') {
+            done = true;
+            onEndRef.current?.({ status: body.status as End['status'], exitCode: body.exitCode ?? null });
+          }
+        }
+      } catch {
+        /* try again on the next tick */
+      }
+      if (!done && !stopped) timer = setTimeout(() => void poll(next), 1500);
+    };
+
+    void (async () => {
+      let hostedMode = false;
+      try {
+        hostedMode = ((await (await fetch('/api/mode', { cache: 'no-store' })).json()) as { hosted?: boolean }).hosted === true;
+      } catch {
+        /* assume local */
+      }
+      if (stopped) return;
+      if (hostedMode) return void poll(0);
+      start();
+    })();
+
+    function start() {
+      source = new EventSource(`/api/jobs/${jobId}/stream`);
+      const src = source;
+      src.addEventListener('lines', (e) => {
+        const { lines: chunk } = JSON.parse((e as MessageEvent).data) as { lines: string[] };
+        setLines((prev) => prev.concat(chunk));
+      });
+      src.addEventListener('end', (e) => {
+        src.close();
+        onEndRef.current?.(JSON.parse((e as MessageEvent).data) as End);
+      });
+      // On a dropped connection EventSource would reconnect and replay from the start; stop instead.
+      src.onerror = () => src.close();
+    }
+
+    return () => {
+      stopped = true;
+      source?.close();
+      if (timer) clearTimeout(timer);
+    };
   }, [jobId]);
 
   useEffect(() => {

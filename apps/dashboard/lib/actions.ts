@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { runJson } from './cli';
+import { hosted } from './hosted';
 import { sessionToken } from './github';
 import type { Step } from './jobs';
 import * as v from './validate';
@@ -21,8 +22,22 @@ type Body = Record<string, unknown>;
 /** `--flag=value`, so the value can never be read as a separate option. */
 const withValue = (flag: string, value: string | undefined): string[] => (value === undefined ? [] : [`${flag}=${value}`]);
 
+/** What a dashboard in your own AWS account cannot do, because there is no local machine or it would put a secret in a job. */
+function hostedLimits(action: unknown, body: Body): void {
+  if (action === 'deploy-folder') {
+    throw new InputError('There is no local folder here. Deploy a GitHub repository, or run `shipzy deploy <folder>` on your machine.');
+  }
+  if (action === 'env-import') {
+    throw new InputError('Importing a .env file is only available from your own machine (`shipzy env import`). Set variables one at a time here.');
+  }
+  if (action === 'deploy-github' && !v.flag(body.reuseToken)) {
+    throw new InputError('Here the GitHub token already stored in your AWS account is used. Connect it once with `shipzy github connect` on your machine.');
+  }
+}
+
 export async function planAction(body: Body): Promise<ActionPlan> {
   const action = body.action;
+  if (hosted()) hostedLimits(action, body);
   switch (action) {
     case 'deploy-folder': {
       const dir = v.absolutePath(body.dir);

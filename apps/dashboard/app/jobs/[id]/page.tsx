@@ -69,7 +69,7 @@ export default function JobPage() {
             <div className="muted small">
               {job.status === 'succeeded'
                 ? urls.length > 0 ? 'A new address can take about 30 seconds to start answering everywhere.' : 'The action completed.'
-                : job.status === 'cancelled' ? 'The local process was stopped.' : 'The last lines of the log say why.'}
+                : job.status === 'cancelled' ? 'The job stopped. A build that had already started in your AWS account carries on by itself and still deploys when it finishes.' : 'The last lines of the log say why.'}
             </div>
           </div>
           {job.status === 'succeeded' &&

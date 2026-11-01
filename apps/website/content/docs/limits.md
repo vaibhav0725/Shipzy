@@ -10,7 +10,7 @@ shipzy is an **early preview**. Everything below is as accurate as we can make i
 ## What it does not do yet
 
 - **Static sites only.** Vite, Create React App and static Next.js exports. Server-rendered Next.js (API routes, middleware, per-request rendering), servers and long-running processes are not supported.
-- **No hosted dashboard.** The dashboard runs on your own computer. A hosted one that connects to your AWS account is planned.
+- **The hosted dashboard is new.** It can run in your own AWS account behind a GitHub sign-in ([how](/docs/hosted-dashboard)), but it has no rate limiting or firewall and has had no independent security review. A dashboard that we run for you does not exist, by design.
 - **One cloud.** shipzy targets AWS only.
 
 ## Limits
@@ -38,7 +38,7 @@ Roughly in this order:
 1. **A first public release.**
 2. **Server-rendered Next.js**, running in your account on Lambda, with the cost and trade-offs written down first.
 3. **Generic servers**: a Node or Express app as a function, then containers for anything else (Python, Go, WebSockets).
-4. **A hosted dashboard** that connects to your AWS account through a cross-account role, with a GitHub App for one-click repository access.
+4. **A hosted dashboard we run for you** that connects to your AWS account through a cross-account role. Only if there is demand and after a security audit: it would end "nothing runs on our servers".
 5. **Other static frameworks** (Vue, Svelte, Astro static).
 
 Dates are not promised. If something here matters to you, tell us.

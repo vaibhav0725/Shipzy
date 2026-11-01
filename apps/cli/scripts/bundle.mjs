@@ -29,3 +29,20 @@ await build({
 fs.chmodSync(outfile, 0o755);
 const kb = Math.round(fs.statSync(outfile).size / 1024);
 console.log(`Wrote ${path.relative(path.resolve(pkgDir, '../..'), outfile)} (${kb} KB, v${version})`);
+
+// The two functions of the hosted dashboard (`shipzy dashboard --deploy`). They run on Lambda's Node 22, each as one
+// file with the AWS SDK inside; `shipzy dashboard --deploy` zips them with the dashboard and this CLI.
+for (const name of ['web', 'worker']) {
+  await build({
+    entryPoints: [path.join(pkgDir, `src/hosted/${name}.ts`)],
+    outfile: path.join(pkgDir, `assets/hosted/${name}.mjs`),
+    bundle: true,
+    platform: 'node',
+    target: 'node22',
+    format: 'esm',
+    banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" },
+    legalComments: 'none',
+    logLevel: 'warning',
+  });
+}
+console.log('Wrote apps/cli/assets/hosted/{web,worker}.mjs');

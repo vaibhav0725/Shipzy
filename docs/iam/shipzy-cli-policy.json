@@ -95,6 +95,10 @@
         "lambda:AddPermission",
         "lambda:RemovePermission",
         "lambda:GetPolicy",
+        "lambda:PutFunctionEventInvokeConfig",
+        "lambda:UpdateFunctionEventInvokeConfig",
+        "lambda:GetFunctionEventInvokeConfig",
+        "lambda:DeleteFunctionEventInvokeConfig",
         "lambda:CreateFunctionUrlConfig",
         "lambda:GetFunctionUrlConfig",
         "lambda:UpdateFunctionUrlConfig",
@@ -189,7 +193,8 @@
       ],
       "Resource": [
         "arn:aws:secretsmanager:*:ACCOUNT_ID:secret:GithubToken*",
-        "arn:aws:secretsmanager:*:ACCOUNT_ID:secret:WebhookSecret*"
+        "arn:aws:secretsmanager:*:ACCOUNT_ID:secret:WebhookSecret*",
+        "arn:aws:secretsmanager:*:ACCOUNT_ID:secret:DeployerDashboard*"
       ]
     },
     {

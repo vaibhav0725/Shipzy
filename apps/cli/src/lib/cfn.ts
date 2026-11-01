@@ -1,5 +1,6 @@
 import { spinner } from './ui.js';
 import {
+  type Capability,
   CloudFormationClient,
   CreateStackCommand,
   DeleteStackCommand,
@@ -42,6 +43,8 @@ export interface DeployStackOptions {
   templateBody: string;
   parameters: Record<string, string>;
   tags?: Record<string, string>;
+  /** needed when the template creates named IAM roles */
+  capabilities?: Capability[];
   /** shown while waiting */
   label?: string;
 }
@@ -61,6 +64,7 @@ export async function deployStack(opts: DeployStackOptions): Promise<{ stack: St
     TemplateBody: opts.templateBody,
     Parameters: Object.entries(opts.parameters).map(([ParameterKey, ParameterValue]) => ({ ParameterKey, ParameterValue })),
     Tags: Object.entries(opts.tags ?? {}).map(([Key, Value]) => ({ Key, Value })),
+    ...(opts.capabilities ? { Capabilities: opts.capabilities } : {}),
   };
   let changed = true;
   if (!existing) {

@@ -5,7 +5,7 @@ section: Dashboard
 order: 1
 ---
 
-The dashboard is a web UI for everything the CLI does: deploy, roll back, manage domains and variables, and follow build logs. It runs **on your own computer**, uses the same AWS profile as the CLI, and never listens on your network. It is optional: the CLI works fully without it.
+The dashboard is a web UI for everything the CLI does: deploy, roll back, manage domains and variables, and follow build logs. It runs **on your own computer**, uses the same AWS profile as the CLI, and never listens on your network. It is optional: the CLI works fully without it. To reach it from anywhere, or share it with a team, you can [run it in your own AWS account](/docs/hosted-dashboard) instead.
 
 ## Start it
 

@@ -132,3 +132,11 @@ export const siteUrl = (host: string) => `https://${host}`;
 /** What a deployment was built as, for display. */
 export const frameworkLabel = (id?: string): string | undefined =>
   ({ vite: 'Vite', 'create-react-app': 'Create React App', react: 'React', 'next-static': 'Next.js (static export)' } as Record<string, string>)[id ?? ''];
+
+export interface Mode { hosted: boolean; user?: string | null }
+
+/** Local or hosted (running in your AWS account), read once per page load. */
+export function useMode(): Mode | undefined {
+  const { data } = useApi<Mode>('/api/mode');
+  return data;
+}

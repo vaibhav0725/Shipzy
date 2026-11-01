@@ -21,3 +21,5 @@ apps/dashboard/*.tsbuildinfo
 apps/website/.next/
 apps/website/out/
 apps/website/next-env.d.ts
+apps/cli/assets/dashboard-template.json
+apps/cli/assets/hosted/
